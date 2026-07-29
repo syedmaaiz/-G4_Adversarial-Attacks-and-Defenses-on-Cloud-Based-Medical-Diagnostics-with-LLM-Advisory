@@ -1,0 +1,2 @@
+"""Simulated cloud inference API."""
+
