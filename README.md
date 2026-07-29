@@ -21,25 +21,44 @@ Python project for evaluating adversarial attacks and defenses on a cloud-hosted
 
 ```text
 .
-├── src/
-│   ├── data/          # Dataset loading, preprocessing, train/val/test splits
-│   ├── models/        # Model definitions, training, checkpoint loading
-│   ├── attacks/       # FGSM/PGD or other adversarial attack methods
-│   ├── defenses/      # Defensive randomization, adversarial training, ADV-SVM experiments
-│   ├── api/           # Simulated cloud API for model inference
-│   ├── llm_advisor/   # LLM prompts, advisory logic, mock fallback
-│   └── evaluation/    # Metrics, plots, attack/defense reports
-├── data/
-│   ├── raw/           # Local raw dataset files, not committed
-│   └── processed/     # Processed dataset files, not committed
-├── artifacts/
-│   ├── models/        # Trained model checkpoints, not committed
-│   └── figures/       # Generated plots and visual outputs
-├── notebooks/         # Exploration and experiments
-├── reports/           # Draft result summaries and course deliverables
-├── docs/              # Planning notes and architecture documentation
-└── tests/             # Unit/integration tests
+|-- src/
+|   |-- data/          # Dataset loading, preprocessing, train/val/test splits
+|   |-- models/        # Model definitions, training, checkpoint loading
+|   |-- attacks/       # FGSM/PGD or other adversarial attack methods
+|   |-- defenses/      # Defensive randomization, adversarial training, ADV-SVM experiments
+|   |-- api/           # Simulated cloud API for model inference
+|   |-- llm_advisor/   # LLM prompts, advisory logic, mock fallback
+|   `-- evaluation/    # Metrics, plots, attack/defense reports
+|-- data/
+|   |-- raw/           # Local raw dataset files, not committed
+|   `-- processed/     # Processed dataset files, not committed
+|-- artifacts/
+|   |-- models/        # Trained model checkpoints, not committed
+|   `-- figures/       # Generated plots and visual outputs
+|-- notebooks/         # Exploration and experiments
+|-- reports/           # Draft result summaries and course deliverables
+|-- docs/              # Planning notes and architecture documentation
+`-- tests/             # Unit/integration tests
 ```
+
+## Dataset Layout
+
+Place the chest X-ray dataset under `data/raw/` like this:
+
+```text
+data/raw/
+|-- train/
+|   |-- NORMAL/
+|   `-- PNEUMONIA/
+|-- test/
+|   |-- NORMAL/
+|   `-- PNEUMONIA/
+`-- val/               # Optional original Kaggle validation split
+    |-- NORMAL/
+    `-- PNEUMONIA/
+```
+
+The training code creates its own validation split from `train/` because the original Kaggle `val/` folder is very small.
 
 ## First Run
 
@@ -51,11 +70,27 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-Then start with:
+Train the baseline classifier:
 
 ```powershell
-python -m src.models.train_baseline
+python -m src.models.train_baseline --epochs 5 --batch-size 32
 ```
 
-The training script is currently a placeholder until the dataset is selected and placed under `data/raw/`.
+For better accuracy, use pretrained weights if your environment can download them:
+
+```powershell
+python -m src.models.train_baseline --epochs 5 --batch-size 32 --pretrained
+```
+
+Run the simulated cloud API after a checkpoint exists:
+
+```powershell
+uvicorn src.api.app:app --reload
+```
+
+Evaluate FGSM attack success after training:
+
+```powershell
+python -m src.attacks.evaluate_fgsm --epsilon 0.03 --max-batches 10
+```
 
