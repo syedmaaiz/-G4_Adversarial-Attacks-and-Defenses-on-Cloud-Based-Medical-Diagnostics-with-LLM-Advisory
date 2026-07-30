@@ -116,7 +116,20 @@ uvicorn src.api.app:app --reload
 Evaluate FGSM attack success after training:
 
 ```powershell
-python -m src.attacks.evaluate_fgsm --epsilon 0.03 --max-batches 10
+python -m src.attacks.evaluate_fgsm --epsilon 0.03
 ```
 
 
+
+## FGSM Evaluation in Colab
+
+After pulling the latest code and training a checkpoint, run the full test set:
+
+```python
+!python -m src.attacks.evaluate_fgsm --epsilon 0.01
+!python -m src.attacks.evaluate_fgsm --epsilon 0.02
+!python -m src.attacks.evaluate_fgsm --epsilon 0.03
+!python -m src.attacks.evaluate_fgsm --epsilon 0.05
+```
+
+Use `Standard attack success rate` in the report. It measures how many clean-correct predictions become wrong after the attack.
