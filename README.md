@@ -134,3 +134,21 @@ After pulling the latest code and training a checkpoint, run the full test set:
 
 Use `Standard attack success rate` in the report. It measures how many clean-correct predictions become wrong after the attack. FGSM adversarial images are clamped back to the valid ImageNet-normalized pixel range before evaluation.
 
+
+## Defense Evaluation in Colab
+
+After FGSM evaluation, compare the baseline attack with defensive randomization:
+
+```python
+!python -m src.defenses.evaluate_randomization --epsilon 0.01
+```
+
+For a small comparison sweep:
+
+```python
+!python -m src.defenses.evaluate_randomization --epsilon 0.01 --resize-delta 8
+!python -m src.defenses.evaluate_randomization --epsilon 0.01 --resize-delta 12
+!python -m src.defenses.evaluate_randomization --epsilon 0.01 --resize-delta 20
+```
+
+For the report, compare `Clean accuracy`, `Adversarial accuracy`, and `Defended adversarial accuracy`. Also include `Defense recovery rate`, which measures how many successful FGSM attacks were corrected by the defense.
