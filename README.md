@@ -132,4 +132,5 @@ After pulling the latest code and training a checkpoint, run the full test set:
 !python -m src.attacks.evaluate_fgsm --epsilon 0.05
 ```
 
-Use `Standard attack success rate` in the report. It measures how many clean-correct predictions become wrong after the attack.
+Use `Standard attack success rate` in the report. It measures how many clean-correct predictions become wrong after the attack. FGSM adversarial images are clamped back to the valid ImageNet-normalized pixel range before evaluation.
+
