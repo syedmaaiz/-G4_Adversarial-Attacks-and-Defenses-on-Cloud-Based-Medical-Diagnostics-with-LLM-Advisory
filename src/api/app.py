@@ -2,12 +2,16 @@
 
 from io import BytesIO
 from pathlib import Path
+from typing import Any
 
 import torch
 from fastapi import FastAPI, File, HTTPException, UploadFile
+from pydantic import BaseModel, Field
 from PIL import Image, UnidentifiedImageError
 
 from src.defenses.randomization import apply_defensive_randomization
+from src.llm_advisor.advisor import recommend_defense
+from src.llm_advisor.prompts import DEFAULT_PROJECT_METRICS
 from src.models.predict import DEFAULT_CHECKPOINT, load_model, predict_image
 
 
@@ -15,6 +19,17 @@ app = FastAPI(title="Medical Diagnostics Cloud API")
 _model = None
 _class_names: list[str] | None = None
 _device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+class AdvisorRequest(BaseModel):
+    metrics: dict[str, Any] = Field(
+        default_factory=lambda: DEFAULT_PROJECT_METRICS,
+        description="Attack and defense metrics for the LLM advisor.",
+    )
+    use_fallback: bool = Field(
+        default=True,
+        description="Return deterministic fallback advice if the LLM API is unavailable.",
+    )
 
 
 def get_loaded_model(checkpoint_path: Path = DEFAULT_CHECKPOINT):
@@ -60,3 +75,19 @@ async def predict(
     result = predict_image(model, image, class_names, _device)
     result["defense_applied"] = use_defense
     return result
+
+
+@app.post("/advisor/recommend")
+def advisor_recommend(request: AdvisorRequest) -> dict[str, object]:
+    """Ask the LLM advisor to recommend an adversarial defense."""
+    try:
+        recommendation = recommend_defense(
+            request.metrics,
+            use_fallback=request.use_fallback,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return {
+        "recommendation": recommendation,
+        "fallback_allowed": request.use_fallback,
+    }

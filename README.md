@@ -174,3 +174,40 @@ Compare that output to the baseline checkpoint:
 ```
 
 For the report, compare baseline `Adversarial accuracy` and `Standard attack success rate` against the same metrics from `adversarial_model.pt`.
+
+## LLM Advisory
+
+Set your LLM API key locally or in Colab before calling the advisor:
+
+```powershell
+$env:LLM_API_KEY="your_api_key_here"
+$env:LLM_MODEL="gpt-4o-mini"
+```
+
+In Colab, use:
+
+```python
+import os
+os.environ["LLM_API_KEY"] = "your_api_key_here"
+os.environ["LLM_MODEL"] = "gpt-4o-mini"
+```
+
+Run the advisor with the latest project metrics:
+
+```powershell
+python -m src.llm_advisor.recommend
+```
+
+In Colab:
+
+```python
+!python -m src.llm_advisor.recommend
+```
+
+The advisor sends the project's attack and defense metrics to an OpenAI-compatible chat-completions endpoint and asks for a concise defense recommendation. If no API key is configured, the command returns fallback guidance so the demo still works.
+
+The API also exposes the advisor:
+
+```text
+POST /advisor/recommend
+```
