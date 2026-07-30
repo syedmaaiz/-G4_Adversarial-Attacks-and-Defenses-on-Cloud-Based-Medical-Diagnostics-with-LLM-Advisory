@@ -76,11 +76,36 @@ Train the baseline classifier:
 python -m src.models.train_baseline --epochs 5 --batch-size 32
 ```
 
-For better accuracy, use pretrained weights if your environment can download them:
+For better accuracy, use pretrained weights if your environment can download them. This project now uses inverse-frequency class weights by default to reduce bias toward the larger `PNEUMONIA` class:
 
 ```powershell
-python -m src.models.train_baseline --epochs 5 --batch-size 32 --pretrained
+python -m src.models.train_baseline --epochs 8 --batch-size 32 --pretrained
 ```
+
+To disable weighted loss for comparison:
+
+```powershell
+python -m src.models.train_baseline --epochs 8 --batch-size 32 --pretrained --no-class-weights
+```
+
+## Google Colab Update Flow
+
+If you already cloned the repo in Colab, pull the latest training improvement before rerunning:
+
+```python
+%cd /content/-G4_Adversarial-Attacks-and-Defenses-on-Cloud-Based-Medical-Diagnostics-with-LLM-Advisory
+!git pull
+!rm -f artifacts/models/baseline_model.pt
+!python -m src.models.train_baseline --epochs 8 --batch-size 32 --pretrained
+```
+
+The improved run should print a line like:
+
+```text
+Class weights: [about 1.94, about 0.67]
+```
+
+Those numbers confirm that the `NORMAL` class is being weighted more heavily during training.
 
 Run the simulated cloud API after a checkpoint exists:
 
@@ -93,4 +118,5 @@ Evaluate FGSM attack success after training:
 ```powershell
 python -m src.attacks.evaluate_fgsm --epsilon 0.03 --max-batches 10
 ```
+
 
