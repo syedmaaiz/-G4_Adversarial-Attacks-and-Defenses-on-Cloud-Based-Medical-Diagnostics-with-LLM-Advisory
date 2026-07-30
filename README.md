@@ -152,3 +152,25 @@ For a small comparison sweep:
 ```
 
 For the report, compare `Clean accuracy`, `Adversarial accuracy`, and `Defended adversarial accuracy`. Also include `Defense recovery rate`, which measures how many successful FGSM attacks were corrected by the defense.
+
+## Adversarial Training in Colab
+
+Adversarial training creates a second checkpoint at `artifacts/models/adversarial_model.pt` using a mix of clean and FGSM examples:
+
+```python
+!python -m src.defenses.train_adversarial --epochs 8 --batch-size 32 --pretrained --epsilon 0.01
+```
+
+Evaluate the adversarially trained model against FGSM:
+
+```python
+!python -m src.attacks.evaluate_fgsm --checkpoint artifacts/models/adversarial_model.pt --epsilon 0.01
+```
+
+Compare that output to the baseline checkpoint:
+
+```python
+!python -m src.attacks.evaluate_fgsm --checkpoint artifacts/models/baseline_model.pt --epsilon 0.01
+```
+
+For the report, compare baseline `Adversarial accuracy` and `Standard attack success rate` against the same metrics from `adversarial_model.pt`.
