@@ -177,19 +177,21 @@ For the report, compare baseline `Adversarial accuracy` and `Standard attack suc
 
 ## LLM Advisory
 
-Set your LLM API key locally or in Colab before calling the advisor:
+The advisor supports Gemini and OpenAI-compatible chat completions. Gemini is the recommended free-tier option for this project. Set your API key locally or in Colab before calling the advisor:
 
 ```powershell
-$env:LLM_API_KEY="your_api_key_here"
-$env:LLM_MODEL="gpt-4o-mini"
+$env:LLM_PROVIDER="gemini"
+$env:GEMINI_API_KEY="your_gemini_key_here"
+$env:GEMINI_MODEL="gemini-2.0-flash"
 ```
 
 In Colab, use:
 
 ```python
 import os
-os.environ["LLM_API_KEY"] = "your_api_key_here"
-os.environ["LLM_MODEL"] = "gpt-4o-mini"
+os.environ["LLM_PROVIDER"] = "gemini"
+os.environ["GEMINI_API_KEY"] = "your_gemini_key_here"
+os.environ["GEMINI_MODEL"] = "gemini-2.0-flash"
 ```
 
 Run the advisor with the latest project metrics:
@@ -204,10 +206,11 @@ In Colab:
 !python -m src.llm_advisor.recommend
 ```
 
-The advisor sends the project's attack and defense metrics to an OpenAI-compatible chat-completions endpoint and asks for a concise defense recommendation. If no API key is configured, the command returns fallback guidance so the demo still works.
+The advisor sends the project's attack and defense metrics to the selected LLM provider and asks for a concise defense recommendation. If no API key is configured, the command returns fallback guidance so the demo still works.
 
 The API also exposes the advisor:
 
 ```text
 POST /advisor/recommend
 ```
+
