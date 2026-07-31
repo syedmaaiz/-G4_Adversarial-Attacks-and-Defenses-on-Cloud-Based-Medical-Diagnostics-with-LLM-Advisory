@@ -258,3 +258,28 @@ If `llama3.2:1b` is too weak or unavailable, try `qwen2.5:1.5b`:
 os.environ["OLLAMA_MODEL"] = "qwen2.5:1.5b"
 !python -m src.llm_advisor.recommend
 ```
+
+## Results Dashboard
+
+The `dashboard-ui` branch includes a static HTML dashboard for understanding the project results. Generate it with:
+
+```powershell
+python -m src.dashboard.generate_dashboard
+```
+
+This writes:
+
+```text
+reports/dashboard.html
+```
+
+In Colab, display it inline:
+
+```python
+!python -m src.dashboard.generate_dashboard
+from IPython.display import HTML, display
+with open("reports/dashboard.html", "r", encoding="utf-8") as f:
+    display(HTML(f.read()))
+```
+
+The dashboard summarizes clean accuracy, FGSM adversarial accuracy, defensive randomization, adversarial training, per-class vulnerability, and the final recommended defense.
