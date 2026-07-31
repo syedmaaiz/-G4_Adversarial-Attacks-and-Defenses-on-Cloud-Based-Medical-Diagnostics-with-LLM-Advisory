@@ -1,6 +1,9 @@
 # Adversarial Attacks and Defenses on Cloud-Based Medical Diagnostics
 
-Python project for evaluating adversarial attacks and defenses on a cloud-hosted chest X-ray classifier, with an LLM advisory component for defense recommendations.\n\nFor a complete fresh Colab walkthrough, see [docs/COLAB_GRADER_RUNBOOK.md](docs/COLAB_GRADER_RUNBOOK.md).
+Python project for evaluating adversarial attacks and defenses on a cloud-hosted chest X-ray classifier, with an LLM advisory component for defense recommendations.
+
+For a complete fresh Colab walkthrough, see [docs/COLAB_GRADER_RUNBOOK.md](docs/COLAB_GRADER_RUNBOOK.md).
+For a ready-to-run Colab notebook, use [notebooks/Grader_Colab_Runbook.ipynb](notebooks/Grader_Colab_Runbook.ipynb).
 
 ## Project Goals
 
