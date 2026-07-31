@@ -112,6 +112,31 @@ def metric_explainer() -> str:
     </section>
     '''
 
+def advisor_story() -> str:
+    return f'''
+    <section class="panel wide">
+      <div class="panel-heading">
+        <h2>LLM Advisory Role</h2>
+        <p>The advisor has two phases: first it suggests defenses after seeing the attack, then it selects the best defense after experiments.</p>
+      </div>
+      <div class="split">
+        <div class="advisor-card">
+          <span>Before defenses were implemented</span>
+          <h3>Pre-defense advice</h3>
+          <p>After seeing that FGSM dropped accuracy to {pct(BASELINE.adversarial_accuracy)} and strongly affected NORMAL images, the advisor recommends trying adversarial training as the main defense and defensive randomization as a lightweight comparison.</p>
+        </div>
+        <div class="advisor-card selected">
+          <span>After defenses were evaluated</span>
+          <h3>Post-defense advice</h3>
+          <p>After comparing results, the advisor recommends adversarial training because it raised attacked-image accuracy to {pct(ADVERSARIAL_MODEL.adversarial_accuracy)} and lowered attack success to {pct(ADVERSARIAL_MODEL.attack_success_rate)}.</p>
+        </div>
+      </div>
+      <div class="explain-box">
+        <strong>Plain-English result</strong>
+        <p>The LLM is not the defense engine. It is the decision-support layer: it reads evidence, recommends what to try, and then explains which defense worked best.</p>
+      </div>
+    </section>
+    '''
 
 def model_comparison() -> str:
     return f'''
@@ -281,6 +306,7 @@ def render_dashboard() -> str:
     </section>
     {plain_english_summary()}
     {metric_explainer()}
+    {advisor_story()}
     <div class="grid">
       {model_comparison()}
       {defense_table()}
@@ -308,3 +334,6 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+

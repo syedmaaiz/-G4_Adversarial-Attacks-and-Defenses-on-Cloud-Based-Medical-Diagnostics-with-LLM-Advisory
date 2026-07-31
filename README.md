@@ -283,3 +283,19 @@ with open("reports/dashboard.html", "r", encoding="utf-8") as f:
 ```
 
 The dashboard summarizes clean accuracy, FGSM adversarial accuracy, defensive randomization, adversarial training, per-class vulnerability, and the final recommended defense.
+
+### LLM Advisory Modes
+
+Run pre-defense advice after the FGSM attack but before defense implementation:
+
+```python
+!python -m src.llm_advisor.recommend --mode pre-defense
+```
+
+Run post-defense advice after randomization and adversarial training have been evaluated:
+
+```python
+!python -m src.llm_advisor.recommend --mode post-defense
+```
+
+Use both outputs in the project story: pre-defense advice explains what defenses to try, while post-defense advice explains which defense worked best.

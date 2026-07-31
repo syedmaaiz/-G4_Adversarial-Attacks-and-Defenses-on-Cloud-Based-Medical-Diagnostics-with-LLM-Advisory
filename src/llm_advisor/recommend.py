@@ -8,18 +8,26 @@ from pathlib import Path
 from typing import Any
 
 from src.llm_advisor.advisor import recommend_defense
-from src.llm_advisor.prompts import DEFAULT_PROJECT_METRICS
+from src.llm_advisor.prompts import get_default_metrics
 
 
-def load_metrics(metrics_json: Path | None) -> dict[str, Any]:
-    """Load metrics from JSON, or use the latest project results."""
+def load_metrics(metrics_json: Path | None, mode: str) -> dict[str, Any]:
+    """Load metrics from JSON, or use built-in metrics for the selected mode."""
     if metrics_json is None:
-        return DEFAULT_PROJECT_METRICS
-    return json.loads(metrics_json.read_text(encoding="utf-8"))
+        return dict(get_default_metrics(mode))
+    metrics = json.loads(metrics_json.read_text(encoding="utf-8"))
+    metrics.setdefault("advisor_mode", mode)
+    return metrics
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Ask the LLM advisor for a defense recommendation.")
+    parser.add_argument(
+        "--mode",
+        choices=("pre-defense", "post-defense"),
+        default="post-defense",
+        help="Use attack-only advice or final defense-selection advice.",
+    )
     parser.add_argument(
         "--metrics-json",
         type=Path,
@@ -36,7 +44,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    metrics = load_metrics(args.metrics_json)
+    metrics = load_metrics(args.metrics_json, args.mode)
     recommendation = recommend_defense(metrics, use_fallback=not args.no_fallback)
     print(recommendation)
 

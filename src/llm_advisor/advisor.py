@@ -51,37 +51,57 @@ def load_config() -> LLMAdvisorConfig:
         provider=os.getenv("LLM_PROVIDER", "openai").strip().lower(),
         openai_api_key=os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY"),
         openai_model=os.getenv("LLM_MODEL", "gpt-4o-mini"),
-        openai_api_url=os.getenv(
-            "LLM_API_URL", "https://api.openai.com/v1/chat/completions"
-        ),
+        openai_api_url=os.getenv("LLM_API_URL", "https://api.openai.com/v1/chat/completions"),
         gemini_api_key=os.getenv("GEMINI_API_KEY"),
         gemini_model=os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
-        gemini_api_url=os.getenv(
-            "GEMINI_API_URL", "https://generativelanguage.googleapis.com/v1beta"
-        ),
+        gemini_api_url=os.getenv("GEMINI_API_URL", "https://generativelanguage.googleapis.com/v1beta"),
         ollama_model=os.getenv("OLLAMA_MODEL", "llama3.2:1b"),
         ollama_base_url=os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434"),
         timeout_seconds=int(os.getenv("LLM_TIMEOUT_SECONDS", "120")),
     )
 
 
+def advisor_mode(metrics: dict[str, Any]) -> str:
+    """Return the advisory mode stored in metrics."""
+    return str(metrics.get("advisor_mode", "post-defense"))
+
+
+def provider_prompt(metrics: dict[str, Any]) -> str:
+    """Build a combined prompt for providers without a separate system role."""
+    return f"{SYSTEM_PROMPT}\n\n{build_advisory_prompt(metrics, advisor_mode(metrics))}"
+
+
 def fallback_recommendation(metrics: dict[str, Any], reason: str) -> str:
     """Return a deterministic recommendation if the LLM call is unavailable."""
     attack = metrics.get("attack", {})
     defenses = metrics.get("defenses", {})
+    baseline_adv_acc = attack.get("adversarial_accuracy_baseline")
+    baseline_asr = attack.get("standard_attack_success_rate_baseline")
+    normal_asr = attack.get("per_class_attack_success_baseline", {}).get("NORMAL")
+
+    if not defenses:
+        return (
+            "LLM advisor fallback used because: "
+            f"{reason}\n\n"
+            "Pre-defense recommendation: implement adversarial training first, "
+            "and test defensive randomization as a lightweight comparison.\n\n"
+            f"Evidence: FGSM reduced baseline adversarial accuracy to {baseline_adv_acc} "
+            f"and achieved a standard attack success rate of {baseline_asr}. "
+            f"NORMAL images were especially vulnerable, with attack success {normal_asr}.\n\n"
+            "Metrics to collect next: defended adversarial accuracy, clean accuracy "
+            "after defense, attack success rate after defense, and per-class attack success."
+        )
+
     randomization = defenses.get("defensive_randomization", {})
     adversarial_training = defenses.get("adversarial_training", {})
-
-    baseline_adv_acc = attack.get("adversarial_accuracy_baseline")
     randomization_adv_acc = randomization.get("defended_adversarial_accuracy")
     adv_training_adv_acc = adversarial_training.get("adversarial_accuracy")
-    baseline_asr = attack.get("standard_attack_success_rate_baseline")
     adv_training_asr = adversarial_training.get("standard_attack_success_rate")
 
     return (
         "LLM advisor fallback used because: "
         f"{reason}\n\n"
-        "Recommended defense: adversarial training.\n\n"
+        "Post-defense recommendation: select adversarial training for deployment.\n\n"
         "Evidence: defensive randomization only modestly improved adversarial "
         f"accuracy from {baseline_adv_acc} to {randomization_adv_acc}, while "
         f"adversarial training improved adversarial accuracy to {adv_training_adv_acc}. "
@@ -107,9 +127,7 @@ def post_json(url: str, payload: dict[str, Any], headers: dict[str, str], timeou
             response_body = response.read().decode("utf-8")
     except urllib.error.HTTPError as exc:
         error_body = exc.read().decode("utf-8", errors="replace")
-        raise LLMAdvisorError(
-            f"LLM API request failed with status {exc.code}: {error_body[:500]}"
-        ) from exc
+        raise LLMAdvisorError(f"LLM API request failed with status {exc.code}: {error_body[:500]}") from exc
     except urllib.error.URLError as exc:
         raise LLMAdvisorError(f"LLM API request failed: {exc}") from exc
 
@@ -125,7 +143,7 @@ def call_openai(metrics: dict[str, Any], config: LLMAdvisorConfig) -> str:
         "model": config.openai_model,
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": build_advisory_prompt(metrics)},
+            {"role": "user", "content": build_advisory_prompt(metrics, advisor_mode(metrics))},
         ],
         "temperature": 0.2,
     }
@@ -157,24 +175,11 @@ def call_gemini(metrics: dict[str, Any], config: LLMAdvisorConfig) -> str:
     base_url = config.gemini_api_url.rstrip("/")
     encoded_model = urllib.parse.quote(model_name, safe="/")
     url = f"{base_url}/{encoded_model}:generateContent"
-    prompt = f"{SYSTEM_PROMPT}\n\n{build_advisory_prompt(metrics)}"
     payload = {
-        "contents": [
-            {
-                "role": "user",
-                "parts": [{"text": prompt}],
-            }
-        ],
-        "generationConfig": {
-            "temperature": 0.2,
-        },
+        "contents": [{"role": "user", "parts": [{"text": provider_prompt(metrics)}]}],
+        "generationConfig": {"temperature": 0.2},
     }
-    data = post_json(
-        url,
-        payload,
-        {"x-goog-api-key": config.gemini_api_key},
-        config.timeout_seconds,
-    )
+    data = post_json(url, payload, {"x-goog-api-key": config.gemini_api_key}, config.timeout_seconds)
 
     try:
         parts = data["candidates"][0]["content"]["parts"]
@@ -190,14 +195,11 @@ def call_gemini(metrics: dict[str, Any], config: LLMAdvisorConfig) -> str:
 def call_ollama(metrics: dict[str, Any], config: LLMAdvisorConfig) -> str:
     """Call a local Ollama model through /api/generate."""
     url = f"{config.ollama_base_url.rstrip('/')}/api/generate"
-    prompt = f"{SYSTEM_PROMPT}\n\n{build_advisory_prompt(metrics)}"
     payload = {
         "model": config.ollama_model,
-        "prompt": prompt,
+        "prompt": provider_prompt(metrics),
         "stream": False,
-        "options": {
-            "temperature": 0.2,
-        },
+        "options": {"temperature": 0.2},
     }
     data = post_json(url, payload, {}, config.timeout_seconds)
     content = data.get("response", "")
@@ -214,15 +216,10 @@ def call_llm(metrics: dict[str, Any], config: LLMAdvisorConfig) -> str:
         return call_gemini(metrics, config)
     if config.provider == "ollama":
         return call_ollama(metrics, config)
-    raise LLMAdvisorError(
-        f"Unsupported LLM_PROVIDER '{config.provider}'. Use 'openai', 'gemini', or 'ollama'."
-    )
+    raise LLMAdvisorError(f"Unsupported LLM_PROVIDER '{config.provider}'. Use 'openai', 'gemini', or 'ollama'.")
 
 
-def recommend_defense(
-    attack_context: dict[str, Any],
-    use_fallback: bool = True,
-) -> str:
+def recommend_defense(attack_context: dict[str, Any], use_fallback: bool = True) -> str:
     """Recommend a defense strategy from attack/defense metadata."""
     try:
         return call_llm(attack_context, load_config())

@@ -146,6 +146,30 @@
       </div>
     </section>
     
+    
+    <section class="panel wide">
+      <div class="panel-heading">
+        <h2>LLM Advisory Role</h2>
+        <p>The advisor has two phases: first it suggests defenses after seeing the attack, then it selects the best defense after experiments.</p>
+      </div>
+      <div class="split">
+        <div class="advisor-card">
+          <span>Before defenses were implemented</span>
+          <h3>Pre-defense advice</h3>
+          <p>After seeing that FGSM dropped accuracy to 53.69% and strongly affected NORMAL images, the advisor recommends trying adversarial training as the main defense and defensive randomization as a lightweight comparison.</p>
+        </div>
+        <div class="advisor-card selected">
+          <span>After defenses were evaluated</span>
+          <h3>Post-defense advice</h3>
+          <p>After comparing results, the advisor recommends adversarial training because it raised attacked-image accuracy to 74.04% and lowered attack success to 13.81%.</p>
+        </div>
+      </div>
+      <div class="explain-box">
+        <strong>Plain-English result</strong>
+        <p>The LLM is not the defense engine. It is the decision-support layer: it reads evidence, recommends what to try, and then explains which defense worked best.</p>
+      </div>
+    </section>
+    
     <div class="grid">
       
     <section class="panel wide">
