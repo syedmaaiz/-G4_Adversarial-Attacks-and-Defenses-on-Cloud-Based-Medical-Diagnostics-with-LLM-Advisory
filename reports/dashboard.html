@@ -5,31 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Adversarial Medical Diagnostics Dashboard</title>
   <style>
-    :root {
-      --bg: #f4f7fb;
-      --ink: #152033;
-      --muted: #627089;
-      --panel: #ffffff;
-      --line: #d9e1ec;
-      --blue: #2f6fed;
-      --green: #16865a;
-      --red: #c93c3c;
-      --amber: #b87613;
-      --shadow: 0 18px 45px rgba(21, 32, 51, 0.11);
-    }
+    :root { --bg: #f4f7fb; --ink: #152033; --muted: #627089; --panel: #ffffff; --line: #d9e1ec; --blue: #2f6fed; --green: #16865a; --red: #c93c3c; --amber: #b87613; --shadow: 0 18px 45px rgba(21, 32, 51, 0.11); }
     * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      color: var(--ink);
-      background: var(--bg);
-      line-height: 1.45;
-    }
-    header {
-      padding: 34px 28px 20px;
-      background: #10243f;
-      color: white;
-    }
+    body { margin: 0; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: var(--ink); background: var(--bg); line-height: 1.45; }
+    header { padding: 34px 28px 20px; background: #10243f; color: white; }
     header h1 { margin: 0 0 8px; font-size: 32px; letter-spacing: 0; }
     header p { margin: 0; max-width: 900px; color: #cfdbeb; }
     main { padding: 24px; max-width: 1180px; margin: 0 auto; }
@@ -39,44 +18,40 @@
     .metric-card span { color: var(--muted); font-size: 13px; font-weight: 700; text-transform: uppercase; }
     .metric-card strong { display: block; font-size: 30px; margin: 8px 0 4px; }
     .metric-card p { margin: 0; color: var(--muted); font-size: 14px; }
-    .metric-card.good strong { color: var(--green); }
-    .metric-card.warn strong { color: var(--amber); }
-    .metric-card.risk strong { color: var(--red); }
+    .metric-card.good strong { color: var(--green); } .metric-card.warn strong { color: var(--amber); } .metric-card.risk strong { color: var(--red); }
     .grid { display: grid; grid-template-columns: 1fr; gap: 18px; }
-    .panel { padding: 20px; }
+    .panel { padding: 20px; margin-bottom: 18px; }
     .panel-heading { display: flex; justify-content: space-between; gap: 20px; align-items: end; border-bottom: 1px solid var(--line); padding-bottom: 12px; margin-bottom: 16px; }
     .panel-heading h2 { margin: 0; font-size: 21px; }
     .panel-heading p { margin: 0; color: var(--muted); max-width: 560px; }
-    .split { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; }
+    .split, .story-grid, .definition-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+    .story-grid, .definition-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
     h3 { margin: 0 0 14px; font-size: 17px; }
+    .story-card, .definition-grid div, .explain-box { border: 1px solid var(--line); border-radius: 8px; background: #fbfdff; padding: 14px; }
+    .story-card { min-height: 190px; }
+    .story-card span { color: var(--muted); font-size: 12px; font-weight: 800; text-transform: uppercase; }
+    .story-card h3 { margin: 8px 0; font-size: 16px; }
+    .story-card p, .definition-grid p, .explain-box p { margin: 0; color: var(--muted); font-size: 14px; }
+    .story-card.good { border-top: 4px solid var(--green); } .story-card.warn { border-top: 4px solid var(--amber); } .story-card.risk { border-top: 4px solid var(--red); }
+    .definition-grid strong, .explain-box strong { display: block; margin-bottom: 6px; }
     .bar-row { margin-bottom: 14px; }
     .bar-label { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; margin-bottom: 6px; }
-    .bar-label span { color: var(--muted); }
-    .bar-track { height: 14px; background: #e8eef6; border-radius: 999px; overflow: hidden; }
-    .bar-fill { height: 100%; border-radius: inherit; }
-    .bar-fill.blue { background: var(--blue); }
-    .bar-fill.green { background: var(--green); }
-    .bar-fill.red { background: var(--red); }
-    .bar-fill.amber { background: var(--amber); }
+    .bar-label span { color: var(--muted); } .bar-track { height: 14px; background: #e8eef6; border-radius: 999px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: inherit; } .bar-fill.blue { background: var(--blue); } .bar-fill.green { background: var(--green); } .bar-fill.red { background: var(--red); } .bar-fill.amber { background: var(--amber); }
     table { width: 100%; border-collapse: collapse; font-size: 14px; }
     th, td { border-bottom: 1px solid var(--line); padding: 11px 10px; text-align: left; vertical-align: top; }
     th { color: var(--muted); font-size: 12px; text-transform: uppercase; }
     .callout { border-left: 5px solid var(--blue); padding: 16px 18px; background: #eef4ff; border-radius: 6px; margin-top: 18px; }
     .callout strong { display: block; margin-bottom: 6px; }
     footer { color: var(--muted); padding: 18px 24px 34px; max-width: 1180px; margin: 0 auto; font-size: 13px; }
-    @media (max-width: 860px) {
-      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .split { grid-template-columns: 1fr; }
-      .panel-heading { display: block; }
-      table { display: block; overflow-x: auto; white-space: nowrap; }
-    }
-    @media (max-width: 520px) { .metrics { grid-template-columns: 1fr; } header h1 { font-size: 26px; } }
+    @media (max-width: 860px) { .metrics, .split, .story-grid, .definition-grid { grid-template-columns: 1fr 1fr; } .panel-heading { display: block; } table { display: block; overflow-x: auto; white-space: nowrap; } }
+    @media (max-width: 560px) { .metrics, .split, .story-grid, .definition-grid { grid-template-columns: 1fr; } header h1 { font-size: 26px; } }
   </style>
 </head>
 <body>
   <header>
     <h1>Adversarial Medical Diagnostics Dashboard</h1>
-    <p>Chest X-ray classification results for baseline training, FGSM attack evaluation, defensive randomization, adversarial training, and LLM advisory conclusions.</p>
+    <p>Chest X-ray classification results explained for both technical and non-technical readers.</p>
   </header>
   <main>
     <section class="metrics">
@@ -84,47 +59,99 @@
     <section class="metric-card good">
       <span>Clean Baseline</span>
       <strong>85.74%</strong>
-      <p>ResNet18 test accuracy before attack</p>
+      <p>How well the original model worked before attack</p>
     </section>
     
       
     <section class="metric-card risk">
-      <span>FGSM Accuracy</span>
+      <span>After FGSM Attack</span>
       <strong>53.69%</strong>
-      <p>Baseline accuracy after epsilon 0.01 attack</p>
+      <p>How much accuracy remained after the attack</p>
     </section>
     
       
     <section class="metric-card good">
-      <span>Adv Training Gain</span>
+      <span>Defense Improvement</span>
       <strong>+20.35 pp</strong>
-      <p>Adversarial accuracy improvement</p>
+      <p>How much adversarial training raised attacked-image accuracy</p>
     </section>
     
       
     <section class="metric-card warn">
       <span>Attack Success Drop</span>
       <strong>-23.57 pp</strong>
-      <p>Lower is better after defense</p>
+      <p>How much adversarial training lowered successful attacks</p>
     </section>
     
     </section>
     <section class="panel wide">
       <div class="panel-heading">
         <h2>Executive Summary</h2>
-        <p>The model is useful on clean images but vulnerable to FGSM. Defensive randomization helps slightly; adversarial training is the recommended defense.</p>
+        <p>The baseline model worked on normal images, but FGSM exposed a real weakness. Adversarial training was the strongest defense.</p>
       </div>
       <div class="callout">
         <strong>Recommended defense: adversarial training</strong>
-        It raised adversarial accuracy from 53.69% to 74.04% and reduced standard attack success from 37.38% to 13.81%, while clean accuracy stayed essentially unchanged.
+        It raised attacked-image accuracy from 53.69% to 74.04% and reduced attack success from 37.38% to 13.81%, while clean accuracy stayed essentially unchanged.
       </div>
     </section>
+    
+    <section class="panel wide">
+      <div class="panel-heading">
+        <h2>What We Did In Simple Words</h2>
+        <p>A non-technical walkthrough of the project result.</p>
+      </div>
+      <div class="story-grid">
+        
+    <article class="story-card good">
+      <span>Step 1</span>
+      <h3>We trained a normal X-ray classifier</h3>
+      <p>The baseline model learned to classify chest X-rays as NORMAL or PNEUMONIA. Before any attack, it was correct 85.74% of the time.</p>
+    </article>
+    
+        
+    <article class="story-card risk">
+      <span>Step 2</span>
+      <h3>We attacked the model</h3>
+      <p>FGSM added tiny calculated changes to the X-ray images. After the attack, baseline accuracy fell to 53.69%, meaning many predictions were fooled.</p>
+    </article>
+    
+        
+    <article class="story-card warn">
+      <span>Step 3</span>
+      <h3>A simple defense helped only a little</h3>
+      <p>Defensive randomization slightly changed images before prediction. It improved attacked-image accuracy to 57.05%, but that was only a small recovery.</p>
+    </article>
+    
+        
+    <article class="story-card good">
+      <span>Step 4</span>
+      <h3>Training with attacked images helped a lot</h3>
+      <p>Adversarial training taught the model using clean and attacked images. Attacked-image accuracy improved to 74.04% while clean accuracy stayed about the same.</p>
+    </article>
+    
+      </div>
+    </section>
+    
+    
+    <section class="panel wide">
+      <div class="panel-heading">
+        <h2>How To Read The Metrics</h2>
+        <p>These short definitions make the dashboard readable without a statistics background.</p>
+      </div>
+      <div class="definition-grid">
+        <div><strong>Clean accuracy</strong><p>How often the model is right on original X-ray images.</p></div>
+        <div><strong>Adversarial accuracy</strong><p>How often the model is still right after the attacker changes the image.</p></div>
+        <div><strong>Attack success rate</strong><p>Out of images the model originally got right, how many became wrong after attack. Lower is better.</p></div>
+        <div><strong>Defense recovery rate</strong><p>Out of successful attacks, how many were corrected by a defense.</p></div>
+      </div>
+    </section>
+    
     <div class="grid">
       
     <section class="panel wide">
       <div class="panel-heading">
         <h2>Baseline vs Adversarial Training</h2>
-        <p>FGSM epsilon = 0.01, test set = 624 images</p>
+        <p>Higher clean/adversarial accuracy is better. Lower attack success is better.</p>
       </div>
       <div class="split">
         <div>
@@ -170,6 +197,10 @@
     
         </div>
       </div>
+      <div class="explain-box">
+        <strong>Plain-English result</strong>
+        <p>The baseline model handled original images well, but the attack exposed a weakness. Adversarial training kept normal-image performance stable and made attacked images much more likely to be classified correctly.</p>
+      </div>
     </section>
     
       
@@ -179,33 +210,29 @@
         <p>Randomization gives a small gain; adversarial training gives the strongest robustness improvement.</p>
       </div>
       <table>
-        <thead>
-          <tr>
-            <th>Defense</th>
-            <th>Clean Accuracy</th>
-            <th>Adversarial Accuracy</th>
-            <th>Recovery Rate</th>
-            <th>Interpretation</th>
-          </tr>
-        </thead>
+        <thead><tr><th>Defense</th><th>Clean Accuracy</th><th>Adversarial Accuracy</th><th>Recovery Rate</th><th>Interpretation</th></tr></thead>
         <tbody>
-            <tr>
-              <td>Defensive Randomization</td>
-              <td>83.81%</td>
-              <td>57.05%</td>
-              <td>10.50%</td>
-              <td>Small robustness gain, but weak recovery against NORMAL-image attacks.</td>
-            </tr>
-            
-            <tr>
-              <td>Adversarial Training</td>
-              <td>85.90%</td>
-              <td>74.04%</td>
-              <td>N/A</td>
-              <td>Strongest defense: improves robustness while preserving clean accuracy.</td>
-            </tr>
-            </tbody>
+          <tr>
+            <td>Defensive Randomization</td>
+            <td>83.81%</td>
+            <td>57.05%</td>
+            <td>10.50%</td>
+            <td>Small robustness gain, but weak recovery against NORMAL-image attacks.</td>
+          </tr>
+        
+          <tr>
+            <td>Adversarial Training</td>
+            <td>85.90%</td>
+            <td>74.04%</td>
+            <td>N/A</td>
+            <td>Strongest defense: improves robustness while preserving clean accuracy.</td>
+          </tr>
+        </tbody>
       </table>
+      <div class="explain-box">
+        <strong>Plain-English result</strong>
+        <p>Randomization was a small patch. Adversarial training was a stronger fix because the model practiced against attacked images during training.</p>
+      </div>
     </section>
     
       
@@ -215,39 +242,33 @@
         <p>NORMAL images were the main vulnerability under FGSM. Adversarial training reduced, but did not eliminate, that class-specific risk.</p>
       </div>
       <table>
-        <thead>
-          <tr>
-            <th>Class</th>
-            <th>Clean Accuracy</th>
-            <th>Baseline FGSM Accuracy</th>
-            <th>Randomized FGSM Accuracy</th>
-            <th>Adv-Trained Attack Success</th>
-          </tr>
-        </thead>
+        <thead><tr><th>Class</th><th>Clean Accuracy</th><th>Baseline FGSM Accuracy</th><th>Randomized FGSM Accuracy</th><th>Adv-Trained Attack Success</th></tr></thead>
         <tbody>
-            <tr>
-              <td>NORMAL</td>
-              <td>63.25%</td>
-              <td>0.85%</td>
-              <td>1.28%</td>
-              <td>50.34%</td>
-            </tr>
-            
-            <tr>
-              <td>PNEUMONIA</td>
-              <td>99.23%</td>
-              <td>85.38%</td>
-              <td>90.51%</td>
-              <td>0.00%</td>
-            </tr>
-            </tbody>
+          <tr>
+            <td>NORMAL</td>
+            <td>63.25%</td>
+            <td>0.85%</td>
+            <td>1.28%</td>
+            <td>50.34%</td>
+          </tr>
+        
+          <tr>
+            <td>PNEUMONIA</td>
+            <td>99.23%</td>
+            <td>85.38%</td>
+            <td>90.51%</td>
+            <td>0.00%</td>
+          </tr>
+        </tbody>
       </table>
+      <div class="explain-box">
+        <strong>Plain-English result</strong>
+        <p>The attack mostly fooled NORMAL examples. This matters because a security problem can affect one class much more than another, even when the overall accuracy looks acceptable.</p>
+      </div>
     </section>
     
     </div>
   </main>
-  <footer>
-    Generated from project metrics. This dashboard is for cybersecurity and ML robustness analysis only; it is not medical advice.
-  </footer>
+  <footer>Generated from project metrics. This dashboard is for cybersecurity and ML robustness analysis only; it is not medical advice.</footer>
 </body>
 </html>
