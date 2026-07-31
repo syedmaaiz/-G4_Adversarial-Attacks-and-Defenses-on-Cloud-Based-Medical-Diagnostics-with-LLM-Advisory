@@ -177,7 +177,7 @@ For the report, compare baseline `Adversarial accuracy` and `Standard attack suc
 
 ## LLM Advisory
 
-The advisor supports Gemini and OpenAI-compatible chat completions. Gemini is the recommended free-tier option for this project. Set your API key locally or in Colab before calling the advisor:
+The advisor supports Ollama, Gemini, and OpenAI-compatible chat completions. Ollama is the recommended no-quota option for this project. Set your API key locally or in Colab before calling the advisor:
 
 ```powershell
 $env:LLM_PROVIDER="gemini"
@@ -214,3 +214,47 @@ The API also exposes the advisor:
 POST /advisor/recommend
 ```
 
+
+## Ollama Advisory in Colab
+
+Ollama can run the advisor locally without OpenAI or Gemini quota. In Colab, pull the latest code first:
+
+```python
+%cd /content/-G4_Adversarial-Attacks-and-Defenses-on-Cloud-Based-Medical-Diagnostics-with-LLM-Advisory
+!git pull
+```
+
+Install and start Ollama:
+
+```python
+!curl -fsSL https://ollama.com/install.sh | sh
+!nohup ollama serve > ollama.log 2>&1 &
+```
+
+Pull a small model:
+
+```python
+!ollama pull llama3.2:1b
+```
+
+Run the advisor through Ollama:
+
+```python
+import os
+os.environ["LLM_PROVIDER"] = "ollama"
+os.environ["OLLAMA_MODEL"] = "llama3.2:1b"
+os.environ["OLLAMA_BASE_URL"] = "http://127.0.0.1:11434"
+os.environ["LLM_TIMEOUT_SECONDS"] = "180"
+```
+
+```python
+!python -m src.llm_advisor.recommend
+```
+
+If `llama3.2:1b` is too weak or unavailable, try `qwen2.5:1.5b`:
+
+```python
+!ollama pull qwen2.5:1.5b
+os.environ["OLLAMA_MODEL"] = "qwen2.5:1.5b"
+!python -m src.llm_advisor.recommend
+```

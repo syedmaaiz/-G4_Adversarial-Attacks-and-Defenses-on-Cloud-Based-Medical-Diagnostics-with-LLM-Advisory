@@ -1,7 +1,7 @@
 """LLM defense advisor.
 
-Supports OpenAI-compatible chat completions and Google Gemini generateContent.
-Provider is selected with LLM_PROVIDER=openai or LLM_PROVIDER=gemini.
+Supports OpenAI-compatible chat completions, Google Gemini generateContent,
+and local Ollama generation. Provider is selected with LLM_PROVIDER.
 """
 
 from __future__ import annotations
@@ -26,6 +26,8 @@ class LLMAdvisorConfig:
     gemini_api_key: str | None
     gemini_model: str
     gemini_api_url: str
+    ollama_model: str
+    ollama_base_url: str
     timeout_seconds: int
 
 
@@ -57,7 +59,9 @@ def load_config() -> LLMAdvisorConfig:
         gemini_api_url=os.getenv(
             "GEMINI_API_URL", "https://generativelanguage.googleapis.com/v1beta"
         ),
-        timeout_seconds=int(os.getenv("LLM_TIMEOUT_SECONDS", "60")),
+        ollama_model=os.getenv("OLLAMA_MODEL", "llama3.2:1b"),
+        ollama_base_url=os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434"),
+        timeout_seconds=int(os.getenv("LLM_TIMEOUT_SECONDS", "120")),
     )
 
 
@@ -183,14 +187,35 @@ def call_gemini(metrics: dict[str, Any], config: LLMAdvisorConfig) -> str:
     return content.strip()
 
 
+def call_ollama(metrics: dict[str, Any], config: LLMAdvisorConfig) -> str:
+    """Call a local Ollama model through /api/generate."""
+    url = f"{config.ollama_base_url.rstrip('/')}/api/generate"
+    prompt = f"{SYSTEM_PROMPT}\n\n{build_advisory_prompt(metrics)}"
+    payload = {
+        "model": config.ollama_model,
+        "prompt": prompt,
+        "stream": False,
+        "options": {
+            "temperature": 0.2,
+        },
+    }
+    data = post_json(url, payload, {}, config.timeout_seconds)
+    content = data.get("response", "")
+    if not content or not content.strip():
+        raise LLMAdvisorError(f"Unexpected Ollama response shape: {data}")
+    return content.strip()
+
+
 def call_llm(metrics: dict[str, Any], config: LLMAdvisorConfig) -> str:
     """Call the configured LLM provider."""
     if config.provider == "openai":
         return call_openai(metrics, config)
     if config.provider == "gemini":
         return call_gemini(metrics, config)
+    if config.provider == "ollama":
+        return call_ollama(metrics, config)
     raise LLMAdvisorError(
-        f"Unsupported LLM_PROVIDER '{config.provider}'. Use 'openai' or 'gemini'."
+        f"Unsupported LLM_PROVIDER '{config.provider}'. Use 'openai', 'gemini', or 'ollama'."
     )
 
 
