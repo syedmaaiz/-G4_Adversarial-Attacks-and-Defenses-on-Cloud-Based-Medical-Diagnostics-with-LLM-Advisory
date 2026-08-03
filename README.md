@@ -276,6 +276,30 @@ This writes:
 reports/dashboard.html
 ```
 
+### Interactive dashboard chatbot
+
+The dashboard also includes a grounded Security Results Assistant with beginner and
+technical explanation modes, suggested questions, conversation history, and a safe
+fallback when the configured LLM is unavailable. Start the dashboard and chat API with:
+
+```powershell
+uvicorn src.dashboard.chat_api:app --reload
+```
+
+Then open `http://127.0.0.1:8000`. The chatbot uses the same `LLM_PROVIDER` configuration
+as the advisor. For local Ollama:
+
+```powershell
+$env:LLM_PROVIDER="ollama"
+$env:OLLAMA_MODEL="qwen2.5:1.5b"
+$env:OLLAMA_BASE_URL="http://127.0.0.1:11434"
+uvicorn src.dashboard.chat_api:app --reload
+```
+
+Opening `reports/dashboard.html` directly still displays the full report and chat UI,
+but live chat requests require the FastAPI server. The assistant is restricted to ML
+security education and project metrics; it does not provide medical advice.
+
 In Colab, display it inline:
 
 ```python
@@ -302,4 +326,3 @@ Run post-defense advice after randomization and adversarial training have been e
 ```
 
 Use both outputs in the project story: pre-defense advice explains what defenses to try, while post-defense advice explains which defense worked best.
-
