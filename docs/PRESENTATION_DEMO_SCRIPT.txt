@@ -1,7 +1,7 @@
 ﻿# Presentation Demo Script - 18 Minutes
 
 Project: Adversarial Attacks and Defenses on Cloud-Based Medical Diagnostics with LLM Advisory
-Speakers: Sayali, Syed, Maitreyee
+Speakers: Sayali, Maitreyee, Syed
 Format: 6 minutes each
 
 Use this as a speaking guide, not a word-for-word memorization script. The goal is to sound natural while keeping the demo organized.
@@ -64,15 +64,15 @@ Third, we evaluate defenses. We compare a lightweight preprocessing defense call
 
 The key question is: after the model is attacked, which defense helps it recover the most?
 
-### 5:15 - 6:00 | Handoff to Syed
+### 5:15 - 6:00 | Handoff to Maitreyee
 
 So to summarize my part: we started with a real chest X-ray dataset, built a Python project using VS Code and GitHub, used Colab for GPU training and evaluation, and used Ollama as a free local LLM advisor.
 
-Now Syed will walk through the actual project flow in Colab: how the model is trained, how the attack is evaluated, how the defenses are implemented, and how the LLM advisor uses the results.
+Now Maitreyee will walk through the actual project flow in Colab: how the model is trained, how the attack is evaluated, how the defenses are implemented, and how the LLM advisor uses the results.
 
 ---
 
-## Speaker 2: Syed - Project Flow, Model, Attack, Defenses, and LLM Advisory
+## Speaker 2: Maitreyee - Project Flow, Model, Attack, Defenses, and LLM Advisory
 
 Target time: 6 minutes
 Main goal: Walk through the Colab notebook and explain the technical project flow clearly.
@@ -104,7 +104,7 @@ This setup step is important because the code assumes a clean folder structure b
 
 Demo cue: show the setup and unzip cells briefly, but do not spend too long here.
 
-### 1:45 - 2:45 | Baseline Model Training
+### 1:45 - 2:40 | Baseline Model Training
 
 Next, we train the baseline model. We use ResNet18 with pretrained ImageNet weights and fine-tune it for binary classification: NORMAL versus PNEUMONIA.
 
@@ -114,17 +114,21 @@ We also use class weights during training. The dataset has more PNEUMONIA images
 
 The output of training includes validation accuracy, precision, recall, F1 score, and a confusion matrix for each epoch. The best checkpoint is saved as artifacts/models/baseline_model.pt.
 
-### 2:45 - 3:35 | Attack Implementation: FGSM
+### 2:40 - 3:45 | Attack Implementation: FGSM
 
 After training the baseline model, we evaluate it against FGSM.
 
-An attack here means we are not changing the model weights. We are changing the input images slightly. FGSM computes the gradient of the loss with respect to the input image, then moves the image pixels a small step in the direction that increases the model's error.
+FGSM stands for Fast Gradient Sign Method. In normal training, the model uses gradients to update its weights and reduce mistakes. FGSM uses a similar idea, but from the attacker's point of view. Instead of improving the model, it looks at the gradient of the loss with respect to the input image and asks: which tiny direction would make this image more confusing for the model?
+
+Then FGSM adds a small step in that direction. The epsilon value controls how large that step is. In our main run, epsilon is 0.01, so the change is intentionally small. The goal is not to create a visibly different X-ray. The goal is to create a slightly altered image that causes the model to change its prediction.
+
+An important detail is that the model weights are not changed during the attack. We are only changing the test input. That is why this is a test-time attack: it shows how vulnerable the already-trained model is when a malicious or corrupted input is submitted.
 
 In our results, the baseline clean accuracy was about 85.74 percent. After FGSM at epsilon 0.01, adversarial accuracy dropped to about 53.69 percent. That means the model looked strong on clean images but became much less reliable when attacked.
 
 The attack success rate measures how many examples that were originally correct became wrong after the attack. Lower is better.
 
-### 3:35 - 4:35 | Defense Implementation
+### 3:45 - 4:45 | Defense Implementation
 
 We implemented two defenses.
 
@@ -134,7 +138,7 @@ The second defense is adversarial training. This is stronger because we train a 
 
 With adversarial training, adversarial accuracy improved to about 74.04 percent, while clean accuracy stayed around 85.90 percent. So this defense improved robustness without sacrificing much clean performance.
 
-### 4:35 - 5:30 | LLM Advisory: How It Works
+### 4:45 - 5:35 | LLM Advisory: How It Works
 
 The LLM advisor is not the defense itself. It is a decision-support layer.
 
@@ -146,30 +150,30 @@ In the post-defense phase, after we run the defense experiments, the advisor rea
 
 In Colab, we use Ollama so the advisor can run without a paid API key. If Ollama is unavailable, the project has a fallback response so the demo still works.
 
-### 5:30 - 6:00 | Handoff to Maitreyee
+### 5:35 - 6:00 | Handoff to Syed
 
 So the Colab notebook shows the full technical pipeline: dataset setup, baseline training, FGSM attack, defense comparison, adversarial training, and LLM advisory.
 
-Next, Maitreyee will show how these results are presented in the dashboard UI, and how the interactive assistant helps explain the project to a non-technical audience.
+Next, Syed will show how these results are presented in the dashboard UI, especially how the pre-defense and post-defense advisor sections turn the experiment results into an understandable recommendation.
 
 ---
 
-## Speaker 3: Maitreyee - Dashboard UI, Interpretation, and Final Summary
+## Speaker 3: Syed - Dashboard UI, Advisor Explanation, and Final Summary
 
 Target time: 6 minutes
-Main goal: Show how the technical results become understandable through the dashboard.
+Main goal: Use the dashboard UI to explain how the technical results materialized into a clear project story.
 
 Suggested screen: dashboard launched from Colab.
 
 ### 0:00 - 0:45 | Dashboard Purpose
 
-Thanks Syed. My part focuses on the dashboard UI and how it helps users understand the results.
+Thanks Maitreyee. My part focuses on the dashboard UI and how it helps users understand the results.
 
 The dashboard was created because raw Colab output can be hard to read. Training logs, confusion matrices, and metric lines are useful for developers, but for a presentation or grader review, we wanted something clearer and more visual.
 
-The dashboard summarizes the project story: the baseline model worked on clean images, the FGSM attack reduced its reliability, defensive randomization helped only slightly, and adversarial training gave the strongest improvement.
+The dashboard summarizes the full project story: the baseline model worked on clean images, the FGSM attack reduced its reliability, defensive randomization helped only slightly, adversarial training gave the strongest improvement, and the LLM advisor explains why that defense is recommended.
 
-### 0:45 - 2:00 | Top Metrics and Plain-English Summary
+### 0:45 - 1:50 | Top Metrics and Plain-English Summary
 
 At the top of the dashboard, we show the most important numbers.
 
@@ -185,23 +189,41 @@ Below that, the dashboard includes a simple explanation section called "What We 
 
 Demo cue: scroll through the top cards and simple summary.
 
-### 2:00 - 3:15 | Interactive Experiment Explorer
+### 1:50 - 2:55 | Interactive Experiment Explorer
 
 The interactive experiment explorer lets the viewer click through the project stages.
 
 Stage 1 is the baseline model. It shows the clean accuracy before attack.
 
-Stage 2 is the FGSM attack. This shows the drop in performance after the attack.
+Stage 2 is the FGSM attack. This is where I would explain FGSM again in dashboard terms: the attacker adds a tiny calculated change to the image, and the model's accuracy drops from 85.74 percent to 53.69 percent. The model has not been retrained here. We are testing how it reacts to attacked inputs.
 
-Stage 3 is defensive randomization. This shows that resizing helped a little but did not solve the problem.
+Stage 3 is defensive randomization. This shows that resizing helped a little but did not solve the problem. The attacked accuracy improved only to 57.05 percent.
 
-Stage 4 is adversarial training. This shows the strongest defense result.
+Stage 4 is adversarial training. This shows the strongest defense result. The model trained with both clean and attacked examples, so attacked-image accuracy improved to 74.04 percent.
 
 This interaction is useful because it turns the project into a timeline. Instead of only seeing a table, the viewer can understand what happened step by step.
 
 Demo cue: click through the four stage buttons.
 
-### 3:15 - 4:20 | Chatbot / Security Results Assistant
+### 2:55 - 4:15 | LLM Advisory Section: Pre-Defense and Post-Defense
+
+Now I will scroll to the LLM Advisory Role section. This is important because it explains what the LLM actually contributes to the project.
+
+The LLM is not training the model, attacking the model, or applying the defense. Those steps are done by our Python code using PyTorch. The LLM is an advisory layer on top of the experiment results.
+
+The first card is the pre-defense advice. This represents the moment after we have trained the baseline and tested FGSM, but before we decide which defense to rely on. At that point, the advisor sees that FGSM reduced baseline accuracy from 85.74 percent to 53.69 percent and that NORMAL images were especially vulnerable. Based on that evidence, it suggests trying adversarial training as the main defense and defensive randomization as a lightweight comparison.
+
+So pre-defense advice answers the question: now that we know the model is vulnerable, what should we try next?
+
+The second card is the post-defense advice. This happens after we actually run the defense experiments. Now the advisor can compare the results. Defensive randomization only slightly improved attacked-image accuracy, while adversarial training improved it to 74.04 percent and reduced attack success to 13.81 percent.
+
+So post-defense advice answers a different question: after testing the defenses, which one worked best and why?
+
+This is why the dashboard says the LLM is a decision-support layer. It helps explain the evidence and recommendation, but the actual evidence comes from the attack and defense experiments.
+
+Demo cue: point to both advisor cards and read the difference between "Before defenses were implemented" and "After defenses were evaluated."
+
+### 4:15 - 5:00 | Chatbot / Security Results Assistant
 
 The dashboard also includes a Security Results Assistant. This assistant can answer questions about the project, such as "What is FGSM?", "Which defense worked best?", or "Why were NORMAL images more vulnerable?"
 
@@ -211,7 +233,7 @@ The important point is that this assistant does not diagnose X-rays or give medi
 
 Demo cue: click "Ask the Security Assistant" and ask: "Which defense performed best and why?"
 
-### 4:20 - 5:15 | Final Result Interpretation
+### 5:00 - 5:35 | Final Result Interpretation
 
 The final interpretation is that clean accuracy alone is not enough to judge whether a model is safe or robust.
 
@@ -219,15 +241,15 @@ Our baseline model had good clean accuracy, but FGSM exposed a serious weakness.
 
 The dashboard also shows per-class behavior. NORMAL images were more vulnerable to the FGSM attack than PNEUMONIA images. That is important because overall accuracy can hide class-specific security risks.
 
-### 5:15 - 6:00 | Closing Summary
+### 5:35 - 6:00 | Closing Summary
 
 To summarize the whole project:
 
 Sayali introduced the problem, tools, dataset, and setup.
 
-Syed showed the implementation flow in Colab: training, attack evaluation, defenses, and LLM advisory.
+Maitreyee showed the implementation flow in Colab: training, attack evaluation, defenses, and LLM advisory.
 
-I showed how the dashboard turns those technical results into an interactive explanation.
+I showed how the dashboard turns those technical results into an interactive explanation, including the pre-defense and post-defense LLM advisory story.
 
 Our final recommendation is adversarial training because it improved attacked-image accuracy from about 53.69 percent to about 74.04 percent and reduced attack success from about 37.38 percent to about 13.81 percent.
 
@@ -238,10 +260,16 @@ This project shows why robustness testing matters for cloud-hosted diagnostic mo
 ## Quick Backup Answers for Q&A
 
 ### What is FGSM?
-FGSM stands for Fast Gradient Sign Method. It creates a small image perturbation in the direction that increases the model's loss, which can cause the model to make an incorrect prediction.
+FGSM stands for Fast Gradient Sign Method. It creates a small image perturbation in the direction that increases the model's loss. A simple way to say it is: the attacker asks the model which tiny pixel-level direction would make the model more wrong, then nudges the image in that direction. The model weights stay the same; only the input image is changed.
+
+### What does epsilon mean in FGSM?
+Epsilon controls how large the adversarial change can be. In our main experiment, epsilon was 0.01, so the perturbation was intentionally small but still strong enough to reduce baseline accuracy.
 
 ### Is the LLM making medical decisions?
 No. The LLM only explains project metrics and recommends a defense based on attack and defense results. It does not diagnose images or replace medical review.
+
+### What is the difference between pre-defense and post-defense LLM advice?
+Pre-defense advice happens after the attack results but before the defense experiments. It suggests what defenses are worth trying. Post-defense advice happens after the defense experiments. It compares the measured results and explains which defense worked best.
 
 ### Why use Ollama?
 Ollama lets us run a small LLM locally in Colab without depending on paid OpenAI or Gemini quota. It makes the demo easier to reproduce.
