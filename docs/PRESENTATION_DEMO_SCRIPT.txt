@@ -1,0 +1,256 @@
+﻿# Presentation Demo Script - 18 Minutes
+
+Project: Adversarial Attacks and Defenses on Cloud-Based Medical Diagnostics with LLM Advisory
+Speakers: Sayali, Syed, Maitreyee
+Format: 6 minutes each
+
+Use this as a speaking guide, not a word-for-word memorization script. The goal is to sound natural while keeping the demo organized.
+
+---
+
+## Speaker 1: Sayali - Problem, Tools, Dataset, and Setup
+
+Target time: 6 minutes
+Main goal: Make the project understandable before any technical details appear.
+
+### 0:00 - 0:45 | Opening and Problem Statement
+
+Hi everyone. Our project is about understanding how adversarial attacks can affect cloud-based medical diagnostic models, and how we can evaluate defenses against those attacks.
+
+In simple terms, imagine we have a machine learning model that looks at chest X-ray images and predicts whether the image is NORMAL or PNEUMONIA. A normal model may perform well on clean images, but attackers can add very small, carefully calculated changes to the image. These changes may be hard for humans to notice, but they can confuse the model and cause a wrong prediction.
+
+That is a serious problem in cloud-based medical diagnostics because users may upload images remotely, and the model may return predictions automatically. Our project studies that security risk in a controlled educational setting.
+
+Important note: this is not a clinical medical tool. It is a cybersecurity and machine learning robustness project using a medical imaging dataset.
+
+### 0:45 - 2:15 | Tools Used
+
+We used four main tools to build and demonstrate the project.
+
+First, we used VS Code as our main development environment. This is where we organized the Python project, wrote the model training code, implemented the attack and defense modules, and created the dashboard. We also used Codex AI inside the development workflow to help make code changes, structure files, and generate documentation faster.
+
+Second, we used GitHub for version control and collaboration. Since this was a team project, GitHub helped us keep track of changes, work on separate branches, and push updates that teammates could pull into their own environments.
+
+Third, we used Google Colab to train and evaluate the models. Colab was useful because it gives access to GPU runtimes, which makes training the PyTorch model much faster than running everything on a local CPU. The final notebook is designed so a grader can run the project from the beginning: mount Google Drive, clone the repo, unzip the dataset, train models, evaluate attacks and defenses, run the LLM advisor, and open the dashboard.
+
+Fourth, we used Ollama as the free local LLM option for the advisor. Ollama lets us run a small language model locally inside the Colab session instead of relying on paid OpenAI or Gemini API quota. In our project, Ollama is not doing the medical prediction. It acts as an advisory layer that reads the attack and defense results and explains which defense is recommended.
+
+### 2:15 - 4:00 | Dataset
+
+The dataset we used is the Kaggle Chest X-Ray Pneumonia dataset. It contains chest X-ray images organized into two classes: NORMAL and PNEUMONIA.
+
+The dataset has train, test, and validation folders. Each folder has subfolders for the two classes. So the expected structure is:
+
+data/raw/train/NORMAL
+data/raw/train/PNEUMONIA
+data/raw/test/NORMAL
+data/raw/test/PNEUMONIA
+data/raw/val/NORMAL
+data/raw/val/PNEUMONIA
+
+In the project, the original Kaggle validation folder is very small, so the training code creates a more useful validation split from the training data. That gives us a better way to choose the best checkpoint while training.
+
+The test folder is kept separate and is used at the end for final evaluation. That matters because we want to evaluate the model on images it did not train on.
+
+### 4:00 - 5:15 | What We Evaluate
+
+The project compares three main stages.
+
+First, we train a baseline classifier on clean X-ray images. This tells us how well the model performs before any attack.
+
+Second, we run an adversarial attack called FGSM. FGSM stands for Fast Gradient Sign Method. The attack uses the model's gradient to create small changes in the input image that push the model toward a wrong prediction.
+
+Third, we evaluate defenses. We compare a lightweight preprocessing defense called defensive randomization with a stronger defense called adversarial training.
+
+The key question is: after the model is attacked, which defense helps it recover the most?
+
+### 5:15 - 6:00 | Handoff to Syed
+
+So to summarize my part: we started with a real chest X-ray dataset, built a Python project using VS Code and GitHub, used Colab for GPU training and evaluation, and used Ollama as a free local LLM advisor.
+
+Now Syed will walk through the actual project flow in Colab: how the model is trained, how the attack is evaluated, how the defenses are implemented, and how the LLM advisor uses the results.
+
+---
+
+## Speaker 2: Syed - Project Flow, Model, Attack, Defenses, and LLM Advisory
+
+Target time: 6 minutes
+Main goal: Walk through the Colab notebook and explain the technical project flow clearly.
+
+Suggested screen: Colab notebook.
+
+### 0:00 - 0:45 | Project Flow Overview
+
+Thanks Sayali. I will walk through the main implementation flow using the Colab notebook.
+
+The project is organized as a Python package under the src folder. The main folders are:
+
+src/data for loading and preprocessing the dataset.
+src/models for the ResNet18 model and baseline training.
+src/attacks for FGSM attack evaluation.
+src/defenses for defensive randomization and adversarial training.
+src/llm_advisor for the advisory logic.
+src/dashboard for the final dashboard and interactive assistant.
+
+The Colab notebook runs these pieces in order, so the grader can reproduce the project from scratch.
+
+### 0:45 - 1:45 | Colab Setup and Dataset Cells
+
+At the top of the notebook, we mount Google Drive, clone the GitHub repo, checkout the dashboard branch, and install the requirements.
+
+Then we unzip the dataset from Google Drive. The notebook expects the dataset zip to be named raw.zip and placed in MyDrive. After unzipping, it verifies that train, test, and validation folders exist with NORMAL and PNEUMONIA classes.
+
+This setup step is important because the code assumes a clean folder structure before training starts.
+
+Demo cue: show the setup and unzip cells briefly, but do not spend too long here.
+
+### 1:45 - 2:45 | Baseline Model Training
+
+Next, we train the baseline model. We use ResNet18 with pretrained ImageNet weights and fine-tune it for binary classification: NORMAL versus PNEUMONIA.
+
+The reason we use pretrained weights is that medical image datasets can be limited, and pretrained features give the model a better starting point.
+
+We also use class weights during training. The dataset has more PNEUMONIA images than NORMAL images, so without class weighting, the model may become biased toward the majority class. Class weights make NORMAL examples count more during loss calculation.
+
+The output of training includes validation accuracy, precision, recall, F1 score, and a confusion matrix for each epoch. The best checkpoint is saved as artifacts/models/baseline_model.pt.
+
+### 2:45 - 3:35 | Attack Implementation: FGSM
+
+After training the baseline model, we evaluate it against FGSM.
+
+An attack here means we are not changing the model weights. We are changing the input images slightly. FGSM computes the gradient of the loss with respect to the input image, then moves the image pixels a small step in the direction that increases the model's error.
+
+In our results, the baseline clean accuracy was about 85.74 percent. After FGSM at epsilon 0.01, adversarial accuracy dropped to about 53.69 percent. That means the model looked strong on clean images but became much less reliable when attacked.
+
+The attack success rate measures how many examples that were originally correct became wrong after the attack. Lower is better.
+
+### 3:35 - 4:35 | Defense Implementation
+
+We implemented two defenses.
+
+The first is defensive randomization. This is a preprocessing defense where the image is resized slightly and then restored before prediction. The idea is that random or slight transformations can disrupt adversarial noise. In our results, this helped only a little. It improved adversarial accuracy from about 53.69 percent to about 57.05 percent.
+
+The second defense is adversarial training. This is stronger because we train a separate model using both clean images and adversarially attacked images. The model learns to handle the kind of perturbations it may face during evaluation.
+
+With adversarial training, adversarial accuracy improved to about 74.04 percent, while clean accuracy stayed around 85.90 percent. So this defense improved robustness without sacrificing much clean performance.
+
+### 4:35 - 5:30 | LLM Advisory: How It Works
+
+The LLM advisor is not the defense itself. It is a decision-support layer.
+
+We use it in two phases.
+
+In the pre-defense phase, after seeing the FGSM attack results, the advisor explains what defenses make sense to try. It recommends adversarial training as the stronger defense and defensive randomization as a lightweight comparison.
+
+In the post-defense phase, after we run the defense experiments, the advisor reads the metrics and recommends the best defense based on evidence. Since adversarial training raised attacked accuracy much more and lowered attack success, the advisor recommends adversarial training.
+
+In Colab, we use Ollama so the advisor can run without a paid API key. If Ollama is unavailable, the project has a fallback response so the demo still works.
+
+### 5:30 - 6:00 | Handoff to Maitreyee
+
+So the Colab notebook shows the full technical pipeline: dataset setup, baseline training, FGSM attack, defense comparison, adversarial training, and LLM advisory.
+
+Next, Maitreyee will show how these results are presented in the dashboard UI, and how the interactive assistant helps explain the project to a non-technical audience.
+
+---
+
+## Speaker 3: Maitreyee - Dashboard UI, Interpretation, and Final Summary
+
+Target time: 6 minutes
+Main goal: Show how the technical results become understandable through the dashboard.
+
+Suggested screen: dashboard launched from Colab.
+
+### 0:00 - 0:45 | Dashboard Purpose
+
+Thanks Syed. My part focuses on the dashboard UI and how it helps users understand the results.
+
+The dashboard was created because raw Colab output can be hard to read. Training logs, confusion matrices, and metric lines are useful for developers, but for a presentation or grader review, we wanted something clearer and more visual.
+
+The dashboard summarizes the project story: the baseline model worked on clean images, the FGSM attack reduced its reliability, defensive randomization helped only slightly, and adversarial training gave the strongest improvement.
+
+### 0:45 - 2:00 | Top Metrics and Plain-English Summary
+
+At the top of the dashboard, we show the most important numbers.
+
+Clean Baseline shows how well the original model worked before attack.
+
+After FGSM Attack shows how much accuracy remained after adversarial perturbations.
+
+Defense Improvement shows how much adversarial training improved attacked-image accuracy.
+
+Attack Success Drop shows how much the successful attacks decreased after adversarial training.
+
+Below that, the dashboard includes a simple explanation section called "What We Did In Simple Words." This is for people who may not know adversarial machine learning. It explains the project as four steps: train the model, attack the model, try a simple defense, and then train with attacked images.
+
+Demo cue: scroll through the top cards and simple summary.
+
+### 2:00 - 3:15 | Interactive Experiment Explorer
+
+The interactive experiment explorer lets the viewer click through the project stages.
+
+Stage 1 is the baseline model. It shows the clean accuracy before attack.
+
+Stage 2 is the FGSM attack. This shows the drop in performance after the attack.
+
+Stage 3 is defensive randomization. This shows that resizing helped a little but did not solve the problem.
+
+Stage 4 is adversarial training. This shows the strongest defense result.
+
+This interaction is useful because it turns the project into a timeline. Instead of only seeing a table, the viewer can understand what happened step by step.
+
+Demo cue: click through the four stage buttons.
+
+### 3:15 - 4:20 | Chatbot / Security Results Assistant
+
+The dashboard also includes a Security Results Assistant. This assistant can answer questions about the project, such as "What is FGSM?", "Which defense worked best?", or "Why were NORMAL images more vulnerable?"
+
+The assistant is grounded in the experiment metrics, so it should explain the results using the same numbers shown in the dashboard. It also has beginner and technical modes.
+
+The important point is that this assistant does not diagnose X-rays or give medical advice. It only explains the cybersecurity and model robustness results from this project.
+
+Demo cue: click "Ask the Security Assistant" and ask: "Which defense performed best and why?"
+
+### 4:20 - 5:15 | Final Result Interpretation
+
+The final interpretation is that clean accuracy alone is not enough to judge whether a model is safe or robust.
+
+Our baseline model had good clean accuracy, but FGSM exposed a serious weakness. Defensive randomization gave only a small improvement. Adversarial training was much stronger because the model learned from attacked examples during training.
+
+The dashboard also shows per-class behavior. NORMAL images were more vulnerable to the FGSM attack than PNEUMONIA images. That is important because overall accuracy can hide class-specific security risks.
+
+### 5:15 - 6:00 | Closing Summary
+
+To summarize the whole project:
+
+Sayali introduced the problem, tools, dataset, and setup.
+
+Syed showed the implementation flow in Colab: training, attack evaluation, defenses, and LLM advisory.
+
+I showed how the dashboard turns those technical results into an interactive explanation.
+
+Our final recommendation is adversarial training because it improved attacked-image accuracy from about 53.69 percent to about 74.04 percent and reduced attack success from about 37.38 percent to about 13.81 percent.
+
+This project shows why robustness testing matters for cloud-hosted diagnostic models, and how an LLM advisory layer can help explain security results in a clearer way.
+
+---
+
+## Quick Backup Answers for Q&A
+
+### What is FGSM?
+FGSM stands for Fast Gradient Sign Method. It creates a small image perturbation in the direction that increases the model's loss, which can cause the model to make an incorrect prediction.
+
+### Is the LLM making medical decisions?
+No. The LLM only explains project metrics and recommends a defense based on attack and defense results. It does not diagnose images or replace medical review.
+
+### Why use Ollama?
+Ollama lets us run a small LLM locally in Colab without depending on paid OpenAI or Gemini quota. It makes the demo easier to reproduce.
+
+### Why use adversarial training?
+Because it directly teaches the model using attacked examples. In our experiment, it improved adversarial accuracy much more than defensive randomization.
+
+### Why does the dashboard matter?
+The dashboard makes the results easier to understand for graders and non-technical viewers. It turns console logs into a visual story and adds an assistant for questions.
+
+### Are the dashboard numbers dynamic?
+The dashboard currently uses the measured project results from our representative runs. If a grader retrains from scratch, small metric differences may happen because model training can vary slightly.
