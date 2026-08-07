@@ -1,0 +1,783 @@
+﻿# Project Q&A Explanation - Current Implementation
+
+Project: Adversarial Attacks and Defenses on Cloud-Based Medical Diagnostics with LLM Advisory
+Purpose of this document: prepare for presentation questions by explaining what we built, how it works, and what the key terms mean.
+
+This project is an educational cybersecurity and machine learning robustness project. It is not a clinical medical diagnosis tool.
+
+---
+
+## 1. One-Minute Project Summary
+
+We built a Python project that trains a chest X-ray image classifier, attacks it with adversarial examples, tests defenses, and uses an LLM advisor to explain which defense is best.
+
+The model classifies X-ray images into two classes:
+
+- NORMAL
+- PNEUMONIA
+
+The workflow is:
+
+1. Load the Kaggle chest X-ray dataset.
+2. Train a baseline ResNet18 image classifier.
+3. Evaluate the baseline model on clean test images.
+4. Attack the model using FGSM adversarial examples.
+5. Measure how much the attack hurts accuracy.
+6. Try defensive randomization.
+7. Train a stronger adversarially trained model.
+8. Compare defenses using metrics.
+9. Use an LLM advisor through Ollama/OpenAI/Gemini-compatible code to explain the results.
+10. Show the final story in an interactive dashboard.
+
+The main finding is that the baseline model performed well on clean images, but FGSM made it much less reliable. Defensive randomization helped only slightly, while adversarial training gave a much stronger robustness improvement.
+
+---
+
+## 2. Tools We Used
+
+### VS Code
+
+VS Code was used as the local development environment. This is where the project files were organized, Python modules were edited, and documentation/dashboard code was created.
+
+### Codex AI
+
+Codex helped with implementation support, code organization, documentation, and debugging. It was used as a coding assistant inside the development workflow, not as the model being trained.
+
+### GitHub
+
+GitHub was used for version control and collaboration. We used branches for different parts of the work, such as model implementation, dashboard updates, and presentation support.
+
+### Google Colab
+
+Google Colab was used to train and evaluate the models. This matters because training ResNet18 on chest X-ray images is slow on CPU, but faster with Colab GPU.
+
+### Ollama
+
+Ollama was used as the free local LLM option. It runs a small language model inside the Colab session and avoids needing paid OpenAI or Gemini quota. In this project, Ollama does not classify X-rays. It only acts as the LLM advisor that reads the metrics and explains what defense should be used.
+
+### PyTorch and Torchvision
+
+PyTorch is the deep learning framework used for training and evaluating the neural network. Torchvision provides the ResNet18 model and image transformation utilities.
+
+### FastAPI and Uvicorn
+
+FastAPI is used for the simulated cloud API and the interactive dashboard chat API. Uvicorn runs the FastAPI server.
+
+---
+
+## 3. Dataset Used
+
+We used the Kaggle Chest X-Ray Pneumonia dataset.
+
+The dataset contains X-ray images organized into two class folders:
+
+- NORMAL
+- PNEUMONIA
+
+The expected local layout is:
+
+```text
+data/raw/train/NORMAL
+data/raw/train/PNEUMONIA
+data/raw/test/NORMAL
+data/raw/test/PNEUMONIA
+data/raw/val/NORMAL
+data/raw/val/PNEUMONIA
+```
+
+Important implementation detail: the code only requires `train` and `test` folders. The Kaggle dataset includes a `val` folder, but that original validation set is very small, so our training code creates its own validation split from the larger training folder.
+
+---
+
+## 4. How Train, Validation, and Test Split Works
+
+This is a common Q&A topic, so explain it clearly.
+
+The Kaggle dataset already comes with train, test, and val folders. However, the original Kaggle validation folder is tiny, so using it directly would not give a very stable validation result.
+
+Instead, our code does this:
+
+1. It loads all images from `data/raw/train`.
+2. It splits that training folder into:
+   - 85% training data
+   - 15% validation data
+3. It uses a fixed random seed of 42 so the split is reproducible.
+4. It keeps `data/raw/test` untouched for final testing.
+
+Why this matters:
+
+- Training data is used to update model weights.
+- Validation data is used during training to choose the best checkpoint.
+- Test data is used only at the end to report final performance.
+
+In the code, this happens in `src/data/dataset.py` using PyTorch `random_split` with `val_fraction=0.15` and `seed=42`.
+
+### Why not use the Kaggle val folder?
+
+Because it is too small to be a reliable validation set. A very small validation set can make the model selection unstable. Creating a 15% validation split from the larger training folder gives a more useful validation measurement.
+
+### Did we train on the test set?
+
+No. The test folder remains untouched during training and validation. It is only used for final evaluation.
+
+---
+
+## 5. Image Preprocessing
+
+Before images go into the model, they are transformed into tensors.
+
+A tensor is just the numerical format used by PyTorch. Images are converted from pixels into arrays of numbers so the neural network can process them.
+
+The project uses image size 224 x 224 because ResNet18 expects this common image size.
+
+### Training transforms
+
+For training images, the code applies:
+
+- Resize to 224 x 224
+- Random horizontal flip
+- Random rotation up to 7 degrees
+- Convert to tensor
+- Normalize using ImageNet mean and standard deviation
+
+Random flip and random rotation are forms of data augmentation. Data augmentation means making small realistic variations of training images so the model becomes less dependent on exact image positioning.
+
+### Validation and test transforms
+
+For validation and test images, the code applies deterministic transforms:
+
+- Resize to 224 x 224
+- Convert to tensor
+- Normalize using ImageNet mean and standard deviation
+
+No random flip or random rotation is used for validation/test because evaluation should be stable and repeatable.
+
+---
+
+## 6. ML Model Used
+
+The model is ResNet18.
+
+ResNet18 is a convolutional neural network, or CNN. A CNN is a neural network architecture designed for images. It learns visual patterns such as edges, textures, shapes, and higher-level structures.
+
+ResNet stands for Residual Network. The main idea is that it uses shortcut connections, also called residual connections, to make training deeper networks easier.
+
+We used Torchvision's ResNet18 implementation. When the `--pretrained` flag is used, the model starts with ImageNet pretrained weights.
+
+### What does pretrained mean?
+
+Pretrained means the model has already learned useful image features from a large dataset before we fine-tune it on our chest X-ray task. It does not mean it already understands chest X-rays. It only means it has a useful starting point for visual features.
+
+### How did we adapt ResNet18 for this project?
+
+The original ResNet18 is designed for 1000 ImageNet classes. Our task has only 2 classes: NORMAL and PNEUMONIA.
+
+So the code replaces the final fully connected layer with a new layer that outputs 2 values, one for each class.
+
+This happens in `src/models/predict.py`:
+
+- Build ResNet18.
+- Replace `model.fc` with `torch.nn.Linear(..., num_classes=2)`.
+
+### What is fine-tuning?
+
+Fine-tuning means taking a pretrained model and continuing to train it on our specific dataset. In our case, we fine-tune ResNet18 on chest X-ray images.
+
+---
+
+## 7. Baseline Training
+
+The baseline training code is in `src/models/train_baseline.py`.
+
+The baseline model is trained using:
+
+- ResNet18
+- Adam optimizer
+- Cross-entropy loss
+- Optional ImageNet pretrained weights
+- Batch size 32 in Colab
+- 8 epochs in the final recommended run
+- Learning rate 5e-5
+- Class-weighted loss by default
+
+### What is cross-entropy loss?
+
+Cross-entropy loss measures how wrong the model's predicted class probabilities are compared to the true label. During training, the optimizer tries to reduce this loss.
+
+### What is Adam optimizer?
+
+Adam is an optimization algorithm that updates the model weights during training. It is commonly used because it adapts the learning rate for different parameters.
+
+### Why class weights?
+
+The dataset has more PNEUMONIA images than NORMAL images. If we train normally, the model can become biased toward the larger class.
+
+Class weighting gives more importance to the smaller class during loss calculation. In our training, NORMAL receives more weight because it has fewer examples.
+
+The class weight formula used is inverse-frequency weighting:
+
+```text
+weight_for_class = total_training_samples / (number_of_classes * class_count)
+```
+
+This helps reduce bias toward the majority class.
+
+### How is the best checkpoint selected?
+
+During baseline training, the model is evaluated on the validation split after each epoch. The checkpoint with the best validation F1 score is saved.
+
+The saved file is:
+
+```text
+artifacts/models/baseline_model.pt
+```
+
+### What is F1 score?
+
+F1 score combines precision and recall into one metric. It is useful when class balance matters.
+
+- Precision asks: when the model predicts PNEUMONIA, how often is it correct?
+- Recall asks: out of all real PNEUMONIA examples, how many did the model find?
+- F1 balances precision and recall.
+
+---
+
+## 8. Baseline Results
+
+From our representative Colab run, the baseline model achieved:
+
+```text
+Clean test accuracy: 85.74%
+Precision: 81.82%
+Recall: 99.23%
+F1 score: 89.69%
+Confusion matrix: [[148, 86], [3, 387]]
+```
+
+The confusion matrix is arranged as:
+
+```text
+[[true NORMAL predicted NORMAL, true NORMAL predicted PNEUMONIA],
+ [true PNEUMONIA predicted NORMAL, true PNEUMONIA predicted PNEUMONIA]]
+```
+
+So this means:
+
+- 148 NORMAL images were correctly predicted as NORMAL.
+- 86 NORMAL images were incorrectly predicted as PNEUMONIA.
+- 3 PNEUMONIA images were incorrectly predicted as NORMAL.
+- 387 PNEUMONIA images were correctly predicted as PNEUMONIA.
+
+This tells us the model was much better at recognizing PNEUMONIA than NORMAL.
+
+---
+
+## 9. What Is an Adversarial Attack?
+
+An adversarial attack is a carefully designed input change that tries to make a machine learning model give the wrong answer.
+
+In this project, the attack changes the X-ray image tensor slightly. The goal is not to make the image obviously different to a human. The goal is to make the model misclassify it.
+
+A simple example:
+
+```text
+Original image: model predicts NORMAL correctly.
+Adversarial image: image is slightly changed, model predicts PNEUMONIA incorrectly.
+```
+
+This matters for cloud-based systems because a model may receive uploaded images from outside users. If an attacker can submit modified inputs, the model may become unreliable.
+
+---
+
+## 10. FGSM Attack
+
+The attack we implemented is FGSM: Fast Gradient Sign Method.
+
+FGSM is a white-box attack. White-box means the attacker has access to the model's gradients. A gradient tells us which direction changes the loss most quickly.
+
+### How FGSM works
+
+1. Take a correctly labeled image.
+2. Pass it through the model.
+3. Compute the loss compared to the true label.
+4. Compute the gradient of that loss with respect to the input image.
+5. Take the sign of the gradient.
+6. Add a small step in that direction.
+7. Clamp the result so it still represents a valid image.
+
+In code, the core idea is:
+
+```text
+adversarial_image = original_image + epsilon * sign(input_gradient)
+```
+
+### What does epsilon mean?
+
+Epsilon controls the perturbation size. A small epsilon means a small change. A larger epsilon means a stronger attack.
+
+In our main evaluation, epsilon was 0.01 in normalized tensor space.
+
+### Does FGSM retrain the model?
+
+No. This is important. During attack evaluation, the model weights stay fixed. FGSM changes the input images, not the trained model.
+
+### Why clamp the adversarial image?
+
+The images are normalized using ImageNet mean and standard deviation. After adding FGSM perturbation, the code clamps the tensor back into the valid normalized image range. This prevents invalid pixel values.
+
+---
+
+## 11. FGSM Attack Results
+
+For the baseline model at epsilon 0.01, our representative result was:
+
+```text
+Evaluated samples: 624
+Clean accuracy: 85.74%
+Adversarial accuracy: 53.69%
+Prediction change rate: 32.05%
+Attack candidates clean-correct: 535
+Successful attacks clean-correct-to-wrong: 200
+Standard attack success rate: 37.38%
+```
+
+### What does clean accuracy mean?
+
+Clean accuracy is accuracy on the original test images before any attack.
+
+### What does adversarial accuracy mean?
+
+Adversarial accuracy is accuracy after the FGSM perturbation is applied.
+
+The drop from 85.74% to 53.69% shows that the baseline model is vulnerable.
+
+### What is prediction change rate?
+
+Prediction change rate measures how often the predicted class changed after attack, regardless of whether the original prediction was correct.
+
+### What are attack candidates?
+
+Attack candidates are examples that the model got correct before the attack. They are the meaningful examples for measuring attack success because an attack can only flip a correct prediction into a wrong one if it was correct first.
+
+### What is standard attack success rate?
+
+Standard attack success rate is:
+
+```text
+successful attacks / clean-correct attack candidates
+```
+
+For our baseline:
+
+```text
+200 / 535 = 37.38%
+```
+
+So FGSM successfully broke 37.38% of the examples that the baseline originally got right.
+
+---
+
+## 12. Per-Class Vulnerability
+
+The attack did not affect both classes equally.
+
+Baseline FGSM at epsilon 0.01:
+
+```text
+NORMAL:
+clean_correct = 148 / 234
+successful_attacks = 146
+attack success rate = 98.65%
+
+PNEUMONIA:
+clean_correct = 387 / 390
+successful_attacks = 54
+attack success rate = 13.95%
+```
+
+This means NORMAL images were much more vulnerable. Almost every correctly predicted NORMAL image was flipped by FGSM.
+
+This is an important talking point because overall accuracy can hide class-specific weaknesses. A model can look acceptable overall while being very fragile for one class.
+
+---
+
+## 13. Defense 1: Defensive Randomization
+
+The first defense was defensive randomization.
+
+A defense is a method used to reduce the effect of adversarial attacks.
+
+Defensive randomization is a preprocessing defense. It modifies the input before giving it to the model. In our implementation, the tensor is resized up using bilinear interpolation and then resized back to the original size.
+
+The idea is that resizing can disrupt some adversarial noise.
+
+### Did defensive randomization change the model?
+
+No. The baseline model stays the same. Only the input image is preprocessed before prediction.
+
+### Result
+
+Best representative randomization result used in the dashboard:
+
+```text
+Resize delta: 8
+Clean accuracy: 85.74%
+Defended clean accuracy: 83.81%
+Adversarial accuracy: 53.69%
+Defended adversarial accuracy: 57.05%
+Defense recovery rate: 10.50%
+Recovered successful attacks: 21 / 200
+```
+
+### Interpretation
+
+Defensive randomization helped slightly, but not enough.
+
+It improved attacked-image accuracy from 53.69% to 57.05%, which is only a small gain. It recovered 21 out of 200 successful attacks.
+
+So we treat it as a lightweight comparison defense, not the final recommended defense.
+
+---
+
+## 14. Defense 2: Adversarial Training
+
+The stronger defense was adversarial training.
+
+Adversarial training means training the model using both clean examples and adversarial examples. Instead of only learning from normal X-rays, the model also practices on FGSM-attacked X-rays during training.
+
+### How our adversarial training works
+
+The code is in `src/defenses/train_adversarial.py`.
+
+For each batch:
+
+1. Compute clean loss on original images.
+2. Generate FGSM adversarial images using the current model.
+3. Compute adversarial loss on the attacked images.
+4. Combine both losses.
+5. Update the model weights.
+
+The default adversarial loss weight is 0.5, meaning the final loss is half clean loss and half adversarial loss:
+
+```text
+loss = 0.5 * clean_loss + 0.5 * adversarial_loss
+```
+
+The adversarially trained checkpoint is saved as:
+
+```text
+artifacts/models/adversarial_model.pt
+```
+
+### How is the best adversarial checkpoint selected?
+
+During adversarial training, the code evaluates both validation clean accuracy and validation adversarial accuracy. It averages them into a selection score:
+
+```text
+selection_score = (validation_clean_accuracy + validation_adversarial_accuracy) / 2
+```
+
+The checkpoint with the best selection score is saved.
+
+### Result
+
+Representative adversarial training result:
+
+```text
+Clean accuracy: 85.90%
+Adversarial accuracy: 74.04%
+Prediction change rate: 11.86%
+Standard attack success rate: 13.81%
+```
+
+### Interpretation
+
+Adversarial training was the strongest defense.
+
+Compared to the baseline under FGSM:
+
+```text
+Baseline adversarial accuracy: 53.69%
+Adversarially trained adversarial accuracy: 74.04%
+```
+
+That is a 20.35 percentage point improvement.
+
+Attack success rate also dropped:
+
+```text
+Baseline attack success rate: 37.38%
+Adversarially trained attack success rate: 13.81%
+```
+
+Clean accuracy stayed almost the same:
+
+```text
+Baseline clean accuracy: 85.74%
+Adversarially trained clean accuracy: 85.90%
+```
+
+This is why adversarial training is the final recommended defense.
+
+---
+
+## 15. LLM Advisory
+
+The LLM advisor is a recommendation and explanation layer.
+
+It does not train the model. It does not attack the model. It does not classify medical images. It reads structured experiment metrics and writes a defense recommendation in plain language.
+
+The advisor supports multiple providers:
+
+- Ollama
+- Gemini
+- OpenAI-compatible API
+
+Ollama is the best demo option because it runs locally in Colab and avoids API quota issues.
+
+### Pre-defense advisory
+
+Pre-defense advisory happens after the baseline model has been attacked but before defenses are implemented.
+
+The advisor receives metrics such as:
+
+- Baseline clean accuracy
+- Baseline adversarial accuracy
+- Prediction change rate
+- Attack success rate
+- Per-class attack success
+
+It then answers questions like:
+
+- What does the attack result mean?
+- Which defenses should we try next?
+- Why are those defenses appropriate?
+- What metrics should we collect after defense implementation?
+
+In our project, pre-defense advice recommends trying adversarial training and defensive randomization because FGSM caused a major drop in accuracy and showed a strong class-specific vulnerability.
+
+### Post-defense advisory
+
+Post-defense advisory happens after defenses have already been evaluated.
+
+The advisor receives the baseline attack metrics plus defense results:
+
+- Defensive randomization metrics
+- Adversarial training metrics
+- Clean accuracy after defense
+- Adversarial accuracy after defense
+- Attack success rate after defense
+- Recovery rate
+
+It then answers:
+
+- Which defense worked best?
+- What evidence supports that recommendation?
+- Why were weaker defenses insufficient?
+- What deployment cautions remain?
+- What should be evaluated next?
+
+In our project, post-defense advice recommends adversarial training because it gave the largest robustness improvement while preserving clean accuracy.
+
+---
+
+## 16. Dashboard UI
+
+The dashboard turns the technical experiment outputs into a visual explanation.
+
+The dashboard includes:
+
+- Top metric cards
+- Plain-English project explanation
+- Metric definitions
+- Interactive experiment explorer
+- LLM advisory role section
+- Defense comparison table
+- Per-class behavior table
+- Security Results Assistant chatbot
+
+The dashboard is generated by:
+
+```text
+src/dashboard/generate_dashboard.py
+```
+
+The interactive dashboard server is:
+
+```text
+src/dashboard/chat_api.py
+```
+
+The chatbot logic is:
+
+```text
+src/dashboard/chat.py
+```
+
+### What does the dashboard help explain?
+
+It helps answer:
+
+- What happened before the attack?
+- What did FGSM do?
+- Which defense helped only slightly?
+- Which defense helped the most?
+- How does the LLM advisory fit into the project?
+- Why should we care about per-class vulnerability?
+
+### Is the dashboard dynamic?
+
+The dashboard currently uses the representative metrics from our project runs. If someone retrains from scratch, small metric changes may happen due to training randomness, but the dashboard presents the measured results used in our final project story.
+
+---
+
+## 17. Simulated Cloud API
+
+The project also includes a FastAPI app for prediction:
+
+```text
+src/api/app.py
+```
+
+This represents the cloud-hosted medical diagnostics idea. A user can send an image to an API endpoint, and the model returns:
+
+- Predicted class
+- Confidence
+- Class probabilities
+
+This is a simulation, not a real deployed medical product.
+
+The security point is that cloud APIs can receive external inputs. If an attacker sends adversarially modified images, the model's prediction can be affected.
+
+---
+
+## 18. Important Metrics to Know for Q&A
+
+### Accuracy
+
+Percentage of total predictions that are correct.
+
+### Precision
+
+Out of the images predicted as PNEUMONIA, how many were actually PNEUMONIA.
+
+### Recall
+
+Out of the actual PNEUMONIA images, how many the model correctly found.
+
+### F1 score
+
+A balance between precision and recall.
+
+### Confusion matrix
+
+A table showing correct and incorrect predictions by class.
+
+For our binary setup:
+
+```text
+[[NORMAL predicted NORMAL, NORMAL predicted PNEUMONIA],
+ [PNEUMONIA predicted NORMAL, PNEUMONIA predicted PNEUMONIA]]
+```
+
+### Clean accuracy
+
+Accuracy on original, unmodified test images.
+
+### Adversarial accuracy
+
+Accuracy after adversarial attack is applied.
+
+### Prediction change rate
+
+How often the predicted class changed after attack.
+
+### Standard attack success rate
+
+Out of images the model originally got correct, how many became wrong after attack.
+
+### Defense recovery rate
+
+Out of successful attacks, how many were fixed by a defense.
+
+### Percentage point
+
+A percentage point is the direct difference between two percentages. For example, going from 53.69% to 74.04% is a 20.35 percentage point increase.
+
+---
+
+## 19. Likely Q&A Questions and Good Answers
+
+### Q: What exactly did you build?
+
+We built a reproducible Python/Colab pipeline that trains a chest X-ray classifier, attacks it with FGSM, evaluates defenses, uses an LLM advisor to recommend a defense, and presents the result in an interactive dashboard.
+
+### Q: What model did you use?
+
+We used ResNet18 from Torchvision. We replaced the final layer so it outputs two classes: NORMAL and PNEUMONIA. In the recommended run, we use ImageNet pretrained weights and fine-tune the model on the chest X-ray dataset.
+
+### Q: How did you split the dataset?
+
+We used the Kaggle train folder as the source for training and validation. Because the original Kaggle validation folder is very small, our code creates a 15% validation split from the training folder using a fixed seed of 42. The test folder stays untouched and is used only for final evaluation.
+
+### Q: Why did you not use the original validation folder?
+
+It is too small to give a reliable validation measurement. A 15% validation split from the larger training folder gives a better checkpoint selection process.
+
+### Q: What is FGSM in simple terms?
+
+FGSM is an attack that makes a tiny calculated change to an image in the direction that increases the model's error. The image may look almost the same, but the model can become confused.
+
+### Q: Did the attack change the model?
+
+No. The attack changes the input images during evaluation. The model weights stay fixed.
+
+### Q: What does epsilon mean?
+
+Epsilon controls the size of the FGSM perturbation. We used epsilon 0.01 for the main comparison.
+
+### Q: Why did you use class weights?
+
+The dataset has more PNEUMONIA images than NORMAL images. Class weights reduce bias by giving more importance to the smaller NORMAL class during training.
+
+### Q: Which defense worked best?
+
+Adversarial training worked best. It improved adversarial accuracy from 53.69% to 74.04% and reduced attack success from 37.38% to 13.81%, while keeping clean accuracy almost unchanged.
+
+### Q: Why was defensive randomization not enough?
+
+It only preprocesses the input. It improved adversarial accuracy from 53.69% to 57.05%, which is a small improvement. It did not teach the model to be robust.
+
+### Q: Why does adversarial training work better?
+
+Because the model practices on attacked examples during training. It learns patterns that help it remain correct even when FGSM-like perturbations are present.
+
+### Q: What did the LLM advisor actually do?
+
+The LLM advisor read the project metrics and explained what defense should be tried or selected. It did not implement the defense itself. It acted as a decision-support and explanation layer.
+
+### Q: What is the difference between pre-defense and post-defense advice?
+
+Pre-defense advice happens after the attack result and recommends candidate defenses to try. Post-defense advice happens after defenses are evaluated and recommends the best defense based on measured results.
+
+### Q: Why use Ollama?
+
+Ollama lets us run a small LLM locally in Colab without paid API quota. That makes the LLM advisor easier to demo and reproduce.
+
+### Q: Is this medically approved?
+
+No. This is not a clinical tool. It is a course project about adversarial ML security and model robustness using a medical image dataset.
+
+### Q: What is the biggest limitation?
+
+The project uses FGSM as the main attack and a two-class dataset. A stronger real-world evaluation should include more attacks, more datasets, external validation, and clinical review.
+
+### Q: What would you improve next?
+
+We would evaluate stronger attacks like PGD, test more defense methods, make dashboard metrics load dynamically from experiment outputs, and evaluate robustness on additional medical imaging datasets.
+
+---
+
+## 20. Final Takeaway
+
+The baseline ResNet18 chest X-ray classifier achieved strong clean performance, but FGSM showed that clean accuracy alone is not enough for security. The model was especially vulnerable on NORMAL images. Defensive randomization gave only a small recovery, while adversarial training substantially improved robustness without hurting clean accuracy. The LLM advisor and dashboard then helped explain these results in a form that is easier for graders and non-technical viewers to understand.
