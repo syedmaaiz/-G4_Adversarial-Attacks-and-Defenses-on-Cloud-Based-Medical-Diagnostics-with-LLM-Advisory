@@ -1,0 +1,91 @@
+﻿\documentclass[10pt]{article}
+\usepackage[margin=0.62in]{geometry}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{titlesec}
+
+\hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue}
+\setlist[itemize]{leftmargin=*, itemsep=1pt, topsep=2pt}
+\setlist[enumerate]{leftmargin=*, itemsep=1pt, topsep=2pt}
+\titlespacing*{\section}{0pt}{6pt}{3pt}
+\titlespacing*{\subsection}{0pt}{4pt}{2pt}
+\setlength{\parskip}{2pt}
+\setlength{\parindent}{0pt}
+
+\title{\vspace{-1.4em}\textbf{Adversarial Attacks and Defenses on Cloud-Based Medical Diagnostics with LLM Advisory}}
+\author{Group Project: Syed, Sayali, and Maitreyee}
+\date{}
+
+\begin{document}
+\maketitle
+\vspace{-1.7em}
+
+\section{Abstract and Problem Statement}
+Cloud-hosted medical diagnostic models can receive images from external users, which makes input manipulation a realistic security concern. This project studies a chest X-ray classifier for two classes, \textsc{Normal} and \textsc{Pneumonia}, and evaluates how adversarial perturbations affect its reliability. We trained a baseline ResNet18 classifier, attacked it using Fast Gradient Sign Method (FGSM), compared two defenses, and used an LLM advisory layer to explain the defense recommendation. This is an educational machine-learning security project, not a clinically approved diagnostic system.
+
+An \textit{adversarial example} is an input that has been slightly modified to fool a model. In our case, the image may still appear visually similar, but the model prediction can change. The main research question was: \textit{if a chest X-ray classifier performs well on clean images, how much does performance degrade under attack, and which defense restores the most robustness?}
+
+\section{Dataset, Split, and Model}
+We used the Kaggle Chest X-Ray Pneumonia dataset, organized into \texttt{NORMAL} and \texttt{PNEUMONIA} folders. The expected structure is \texttt{data/raw/train}, \texttt{data/raw/test}, and optionally \texttt{data/raw/val}. Although Kaggle provides a validation folder, it is very small, so our code creates a more reliable validation split from the larger training folder.
+
+The split strategy was:
+\begin{itemize}
+    \item Load all images from \texttt{data/raw/train}.
+    \item Use 85\% for training and 15\% for validation with a fixed seed of 42.
+    \item Keep \texttt{data/raw/test} untouched for final evaluation.
+\end{itemize}
+Training data updates model weights, validation data selects the best checkpoint, and test data is reserved for final reporting.
+
+The model is Torchvision ResNet18, a convolutional neural network with residual connections. We used ImageNet-pretrained weights and replaced the final classification layer with a two-output layer for \textsc{Normal} and \textsc{Pneumonia}. Images were resized to $224 \times 224$, normalized with ImageNet mean/std, and augmented during training using small rotations and horizontal flips. Because the dataset contains more pneumonia images than normal images, we used inverse-frequency class weights in cross-entropy loss to reduce majority-class bias.
+
+\section{Attack and Defense Methods}
+\textbf{FGSM attack.} FGSM stands for Fast Gradient Sign Method. It is a gradient-based white-box attack. The attacker computes the gradient of the loss with respect to the input image and perturbs the image in the direction that increases error:
+\[
+    x_{adv} = x + \epsilon \cdot \mathrm{sign}(\nabla_x J(\theta, x, y)).
+\]
+Here, $x$ is the original image tensor, $y$ is the true label, $J$ is cross-entropy loss, and $\epsilon$ controls perturbation size. Our main comparison used $\epsilon=0.01$ in normalized tensor space. The model weights are not changed during the attack; only the test input is modified. We clamp the perturbed tensor back to the valid normalized image range.
+
+\textbf{Defensive randomization.} This lightweight defense preprocesses the input by resizing it up using bilinear interpolation and resizing it back before prediction. The model is unchanged. The intuition is that small transformations can disrupt adversarial noise, but this defense does not teach the model to recognize attacked examples.
+
+\textbf{Adversarial training.} This stronger defense trains a separate ResNet18 on both clean and FGSM-attacked images. For each batch, we compute clean loss, generate FGSM examples, compute adversarial loss, and optimize a combined objective:
+\[
+    L = 0.5L_{clean} + 0.5L_{adv}.
+\]
+The best adversarial checkpoint is selected using the average of validation clean accuracy and validation adversarial accuracy.
+
+\section{Results}
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lccc}
+\toprule
+\textbf{Model / Defense} & \textbf{Clean Acc.} & \textbf{Adv. Acc.} & \textbf{Attack Success} \\
+\midrule
+Baseline ResNet18 & 85.74\% & 53.69\% & 37.38\% \\
+Defensive randomization & 83.81\% defended clean & 57.05\% & 37.38\% baseline attack \\
+Adversarial training & 85.90\% & 74.04\% & 13.81\% \\
+\bottomrule
+\end{tabular}
+\caption{Representative results at FGSM $\epsilon=0.01$. Higher adversarial accuracy and lower attack success are better.}
+\end{table}
+
+The baseline model achieved 85.74\% clean test accuracy, but FGSM reduced accuracy to 53.69\%. This shows that clean accuracy alone does not prove robustness. Defensive randomization only improved attacked-image accuracy to 57.05\%, recovering 21 of 200 successful attacks. Adversarial training was substantially stronger: adversarial accuracy improved to 74.04\%, and attack success dropped from 37.38\% to 13.81\% while clean accuracy stayed approximately unchanged.
+
+Per-class results revealed a major weakness: FGSM was especially effective against \textsc{Normal} images. In the baseline attack evaluation, \textsc{Normal} had a 98.65\% class attack success rate, while \textsc{Pneumonia} had 13.95\%. This matters because aggregate accuracy can hide class-specific security risks.
+
+\section{LLM Advisory and Dashboard}
+The LLM advisor is a decision-support layer, not the defense itself. It reads structured project metrics and generates an evidence-based recommendation. We implemented provider support for Ollama, Gemini, and OpenAI-compatible APIs; Ollama was used as the free local option in Colab.
+
+The advisor has two modes. \textit{Pre-defense} mode runs after the FGSM evaluation and recommends defenses worth trying based on the observed vulnerability. \textit{Post-defense} mode runs after defenses are evaluated and recommends the final defense using measured evidence. In our final results, it recommends adversarial training because it produced the largest robustness improvement.
+
+We also built an interactive dashboard with plain-English explanations, metric cards, an experiment-stage explorer, defense comparison tables, per-class vulnerability summaries, and a grounded Security Results Assistant chatbot. The dashboard helps graders and non-technical viewers understand how the implementation results connect to the final recommendation.
+
+\section{Limitations and Conclusion}
+This project uses FGSM as a controlled benchmark attack, but real-world attackers may use stronger or different methods. In deployment, defenders usually do not know the exact attack in advance; instead, they define a threat model and test against representative attacks. Future work should evaluate stronger attacks such as PGD or BIM, additional datasets, dynamic dashboard metrics, and broader clinical validation.
+
+Overall, the project demonstrates a complete adversarial-ML workflow: train a medical image classifier, expose its vulnerability under attack, compare defenses, use an LLM advisor to interpret results, and present the findings through an interactive dashboard. The final recommended defense is adversarial training because it significantly improved robustness without reducing clean test performance.
+
+\end{document}
