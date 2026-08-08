@@ -7,6 +7,7 @@ from time import perf_counter
 import torch
 
 from src.data.dataset import RAW_DATA_DIR, create_dataloaders
+from src.evaluation.metric_store import BASELINE_TRAINING_JSON, DEFAULT_METRICS_DIR, metrics_path, write_metrics_json
 from src.evaluation.metrics import ClassificationMetrics, evaluate_classifier
 from src.models.predict import DEFAULT_CHECKPOINT, build_resnet18
 
@@ -99,6 +100,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--learning-rate", type=float, default=5e-5)
     parser.add_argument("--val-fraction", type=float, default=0.15)
     parser.add_argument("--num-workers", type=int, default=0)
+    parser.add_argument("--metrics-dir", type=Path, default=DEFAULT_METRICS_DIR)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(
         "--pretrained",
@@ -177,15 +179,37 @@ def main() -> None:
     checkpoint = torch.load(args.checkpoint, map_location=device)
     model.load_state_dict(checkpoint["model_state_dict"])
     test_metrics = evaluate_classifier(model, test_loader, device)
+    validation_metrics = ClassificationMetrics(**checkpoint["metrics"]["validation"])
     save_checkpoint(
         args.checkpoint,
         model,
         class_names,
         best_epoch,
-        ClassificationMetrics(**checkpoint["metrics"]["validation"]),
+        validation_metrics,
         class_weight_values,
         test_metrics,
     )
+    metrics_output = metrics_path(args.metrics_dir, BASELINE_TRAINING_JSON)
+    write_metrics_json(
+        metrics_output,
+        {
+            "run_type": "baseline_training",
+            "checkpoint": str(args.checkpoint),
+            "model": "ResNet18",
+            "pretrained": args.pretrained,
+            "epochs": args.epochs,
+            "best_epoch": best_epoch,
+            "batch_size": args.batch_size,
+            "learning_rate": args.learning_rate,
+            "val_fraction": args.val_fraction,
+            "seed": args.seed,
+            "class_names": class_names,
+            "class_weights": class_weight_values,
+            "validation": validation_metrics.__dict__,
+            "test": test_metrics.__dict__,
+        },
+    )
+    print(f"Metrics JSON written to {metrics_output}")
 
     elapsed_minutes = (perf_counter() - start_time) / 60
     print(f"Best epoch: {best_epoch}")

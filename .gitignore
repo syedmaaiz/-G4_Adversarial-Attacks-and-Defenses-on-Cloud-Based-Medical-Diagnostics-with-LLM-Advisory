@@ -23,6 +23,7 @@ data/processed/*
 artifacts/models/*
 artifacts/figures/*
 reports/generated/*
+reports/metrics/*
 
 # Keep folder placeholders
 !data/raw/.gitkeep

@@ -45,12 +45,12 @@ REPO_DIR = "/content/-G4_Adversarial-Attacks-and-Defenses-on-Cloud-Based-Medical
 import os
 
 if not os.path.exists(REPO_DIR):
-    !git clone --branch dashboard-ui {REPO_URL}
+    !git clone --branch dashboard-ui-updates {REPO_URL}
 else:
     %cd {REPO_DIR}
     !git fetch
-    !git checkout dashboard-ui
-    !git pull
+    !git checkout dashboard-ui-updates
+    !git pull origin dashboard-ui-updates
 
 %cd {REPO_DIR}
 !pip install -r requirements.txt
@@ -213,7 +213,7 @@ os.environ["LLM_TIMEOUT_SECONDS"] = "240"
 
 ## Cell 9: Run Pre-Defense And Post-Defense LLM Advice
 
-Pre-defense advice only sees the baseline attack result. Post-defense advice sees all defense results.
+Pre-defense advice uses the saved baseline FGSM JSON metrics when available. Post-defense advice uses the saved attack and defense JSON metrics when available.
 
 ```python
 %cd /content/-G4_Adversarial-Attacks-and-Defenses-on-Cloud-Based-Medical-Diagnostics-with-LLM-Advisory
@@ -240,7 +240,7 @@ with open("reports/dashboard.html", "r", encoding="utf-8") as f:
     display(HTML(f.read()))
 ```
 
-The dashboard should show:
+The dashboard reads the latest saved JSON files from `reports/metrics/`. It should show:
 
 - Clean baseline accuracy
 - Accuracy drop after FGSM attack
@@ -249,6 +249,8 @@ The dashboard should show:
 - Per-class vulnerability, especially NORMAL images
 - Pre-defense and post-defense LLM advisory roles
 - Plain-English explanations for non-statistics readers
+
+If a grader retrains and gets slightly different numbers, the dashboard should reflect the latest saved metric JSON files from that run.
 
 ## Optional Cell 11: Save Trained Checkpoints To Google Drive
 

@@ -264,7 +264,7 @@ os.environ["OLLAMA_MODEL"] = "qwen2.5:1.5b"
 
 ## Results Dashboard
 
-The `dashboard-ui` branch includes a static HTML dashboard for understanding the project results. Generate it with:
+The `dashboard-ui-updates` branch includes an interactive dashboard for understanding the project results. Evaluation and training commands now save JSON metrics under `reports/metrics/`, and the dashboard reads those latest saved metrics when present. Generate it with:
 
 ```powershell
 python -m src.dashboard.generate_dashboard
@@ -309,7 +309,7 @@ with open("reports/dashboard.html", "r", encoding="utf-8") as f:
     display(HTML(f.read()))
 ```
 
-The dashboard summarizes clean accuracy, FGSM adversarial accuracy, defensive randomization, adversarial training, per-class vulnerability, and the final recommended defense.
+The dashboard summarizes clean accuracy, FGSM adversarial accuracy, defensive randomization, adversarial training, per-class vulnerability, and the final recommended defense. If `reports/metrics/` is missing, it falls back to representative project metrics so the demo still opens.
 
 ### LLM Advisory Modes
 

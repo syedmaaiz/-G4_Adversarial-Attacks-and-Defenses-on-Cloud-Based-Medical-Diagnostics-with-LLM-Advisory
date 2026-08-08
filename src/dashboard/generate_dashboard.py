@@ -7,6 +7,16 @@ import html
 from dataclasses import dataclass
 from pathlib import Path
 
+from src.evaluation.metric_store import (
+    ADVERSARIAL_TRAINING_JSON,
+    DEFAULT_METRICS_DIR,
+    FGSM_ADVERSARIAL_JSON,
+    FGSM_BASELINE_JSON,
+    RANDOMIZATION_JSON,
+    metrics_path,
+    read_metrics_json,
+)
+
 
 DEFAULT_OUTPUT = Path("reports/dashboard.html")
 
@@ -39,6 +49,98 @@ PER_CLASS_ROWS = [
     ("PNEUMONIA", 0.9923, 0.8538, 0.9051, 0.0000),
 ]
 
+
+
+def _ratio(numerator: float, denominator: float) -> float:
+    return numerator / denominator if denominator else 0.0
+
+
+def load_dashboard_metrics(metrics_dir: Path = DEFAULT_METRICS_DIR) -> str:
+    """Load latest saved metrics into dashboard globals when available."""
+    global BASELINE, ADVERSARIAL_MODEL, RANDOMIZATION, ADVERSARIAL_TRAINING, PER_CLASS_ROWS
+
+    source_note = "representative project metrics"
+    baseline_fgsm = read_metrics_json(metrics_path(metrics_dir, FGSM_BASELINE_JSON))
+    randomization = read_metrics_json(metrics_path(metrics_dir, RANDOMIZATION_JSON))
+    adversarial_fgsm = read_metrics_json(metrics_path(metrics_dir, FGSM_ADVERSARIAL_JSON))
+    adversarial_training = read_metrics_json(metrics_path(metrics_dir, ADVERSARIAL_TRAINING_JSON))
+
+    if baseline_fgsm:
+        attack = baseline_fgsm.get("attack", {})
+        BASELINE = ModelResult(
+            "Baseline ResNet18",
+            float(attack.get("clean_accuracy", BASELINE.clean_accuracy)),
+            float(attack.get("adversarial_accuracy", BASELINE.adversarial_accuracy)),
+            float(attack.get("standard_attack_success_rate", BASELINE.attack_success_rate)),
+            float(attack.get("prediction_change_rate", BASELINE.prediction_change_rate)),
+        )
+        source_note = f"latest saved metrics from {metrics_dir.as_posix()}"
+
+    if randomization:
+        randomization_metrics = randomization.get("randomization", {})
+        RANDOMIZATION = DefenseResult(
+            "Defensive Randomization",
+            randomization_metrics.get("defended_clean_accuracy", RANDOMIZATION.defended_clean_accuracy),
+            float(randomization_metrics.get("defended_adversarial_accuracy", RANDOMIZATION.defended_adversarial_accuracy)),
+            randomization_metrics.get("defense_recovery_rate", RANDOMIZATION.recovery_rate),
+            "Small robustness gain, but weak recovery against NORMAL-image attacks.",
+        )
+
+    if adversarial_fgsm or adversarial_training:
+        adv_attack = (adversarial_fgsm or {}).get("attack", {})
+        adv_test = (adversarial_training or {}).get("test", {})
+        ADVERSARIAL_MODEL = ModelResult(
+            "Adversarially Trained ResNet18",
+            float(adv_attack.get("clean_accuracy", adv_test.get("accuracy", ADVERSARIAL_MODEL.clean_accuracy))),
+            float(
+                adv_attack.get(
+                    "adversarial_accuracy",
+                    (adversarial_training or {}).get("test_adversarial_accuracy", ADVERSARIAL_MODEL.adversarial_accuracy),
+                )
+            ),
+            float(adv_attack.get("standard_attack_success_rate", ADVERSARIAL_MODEL.attack_success_rate)),
+            float(adv_attack.get("prediction_change_rate", ADVERSARIAL_MODEL.prediction_change_rate)),
+        )
+        ADVERSARIAL_TRAINING = DefenseResult(
+            "Adversarial Training",
+            ADVERSARIAL_MODEL.clean_accuracy,
+            ADVERSARIAL_MODEL.adversarial_accuracy,
+            None,
+            "Strongest defense: improves robustness while preserving clean accuracy.",
+        )
+
+    if baseline_fgsm:
+        baseline_classes = baseline_fgsm.get("attack", {}).get("per_class", {})
+        randomized_classes = (randomization or {}).get("randomization", {}).get("per_class", {})
+        adversarial_classes = (adversarial_fgsm or {}).get("attack", {}).get("per_class", {})
+        rows = []
+        for class_name, values in baseline_classes.items():
+            total = values.get("total", 0)
+            clean_correct = values.get("clean_correct", 0)
+            randomized = randomized_classes.get(class_name, {})
+            adversarial = adversarial_classes.get(class_name, {})
+            rows.append(
+                (
+                    class_name,
+                    randomized.get("clean_accuracy", values.get("clean_accuracy", _ratio(clean_correct, total))),
+                    randomized.get("adversarial_accuracy", values.get("adversarial_accuracy", 0.0)),
+                    randomized.get("defended_adversarial_accuracy", values.get("adversarial_accuracy", 0.0)),
+                    adversarial.get("success_rate", values.get("success_rate", 0.0)),
+                )
+            )
+        if rows:
+            PER_CLASS_ROWS = [
+                (
+                    class_name,
+                    float(clean),
+                    float(attacked if attacked is not None else 0.0),
+                    float(randomized if randomized is not None else 0.0),
+                    float(adv_success),
+                )
+                for class_name, clean, attacked, randomized, adv_success in rows
+            ]
+
+    return source_note
 
 def pct(value: float) -> str:
     return f"{value * 100:.2f}%"
@@ -229,7 +331,8 @@ def per_class_table() -> str:
     '''
 
 
-def render_dashboard() -> str:
+def render_dashboard(metrics_dir: Path = DEFAULT_METRICS_DIR) -> str:
+    source_note = load_dashboard_metrics(metrics_dir)
     improvement = delta(ADVERSARIAL_MODEL.adversarial_accuracy, BASELINE.adversarial_accuracy)
     attack_reduction = delta(ADVERSARIAL_MODEL.attack_success_rate, BASELINE.attack_success_rate)
     return f'''<!doctype html>
@@ -381,7 +484,7 @@ def render_dashboard() -> str:
       {per_class_table()}
     </div>
   </main>
-  <footer>Generated from project metrics. This dashboard is for cybersecurity and ML robustness analysis only; it is not medical advice.</footer>
+  <footer>Generated from {html.escape(source_note)}. This dashboard is for cybersecurity and ML robustness analysis only; it is not medical advice.</footer>
   <button class="chat-launcher" id="chat-launcher" aria-controls="chat-panel" aria-expanded="false"><span class="pulse"></span>Ask the Security Assistant</button>
   <aside class="chat-panel" id="chat-panel" aria-label="Security Results Assistant" hidden>
     <div class="chat-header">
@@ -511,13 +614,14 @@ def render_dashboard() -> str:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate the project results dashboard.")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument("--metrics-dir", type=Path, default=DEFAULT_METRICS_DIR)
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(render_dashboard(), encoding="utf-8")
+    args.output.write_text(render_dashboard(args.metrics_dir), encoding="utf-8")
     print(f"Dashboard written to {args.output}")
 
 

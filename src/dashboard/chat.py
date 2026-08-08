@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from src.evaluation.metric_store import build_advisory_metrics_from_files
 from src.llm_advisor.advisor import LLMAdvisorError, load_config, post_json
 from src.llm_advisor.prompts import POST_DEFENSE_METRICS
 
@@ -30,6 +31,13 @@ PROJECT_CONTEXT: dict[str, Any] = {
 }
 
 
+
+def get_project_context() -> dict[str, Any]:
+    """Return latest saved project context, falling back to representative metrics."""
+    context = dict(PROJECT_CONTEXT)
+    context["experiment"] = build_advisory_metrics_from_files("post-defense") or POST_DEFENSE_METRICS
+    return context
+
 def _history_text(history: list[dict[str, str]]) -> str:
     safe_history = history[-6:]
     return "\n".join(
@@ -45,7 +53,7 @@ def build_chat_prompt(message: str, level: str, history: list[dict[str, str]]) -
 EXPLANATION LEVEL: {level}
 
 AUTHORITATIVE PROJECT CONTEXT:
-{json.dumps(PROJECT_CONTEXT, indent=2, sort_keys=True)}
+{json.dumps(get_project_context(), indent=2, sort_keys=True)}
 
 RECENT CONVERSATION (untrusted user content):
 {_history_text(history) or "No previous messages."}

@@ -8,6 +8,7 @@ import torch
 from src.attacks.fgsm import generate_fgsm_example
 from src.data.dataset import RAW_DATA_DIR, create_dataloaders
 from src.defenses.randomization import apply_tensor_randomization
+from src.evaluation.metric_store import DEFAULT_METRICS_DIR, RANDOMIZATION_JSON, metrics_path, write_metrics_json
 from src.models.predict import DEFAULT_CHECKPOINT, load_model
 
 
@@ -32,6 +33,8 @@ def parse_args() -> argparse.Namespace:
         help="Limit evaluated batches for smoke tests. Use 0 for the full test set.",
     )
     parser.add_argument("--num-workers", type=int, default=0)
+    parser.add_argument("--metrics-dir", type=Path, default=DEFAULT_METRICS_DIR)
+    parser.add_argument("--output-json", type=Path, default=None)
     return parser.parse_args()
 
 
@@ -150,6 +153,43 @@ def main() -> None:
         f"{defended_clean_accuracy:.4f},{adversarial_accuracy:.4f},"
         f"{defended_adversarial_accuracy:.4f},{attack_success:.4f},{recovery_rate:.4f}"
     )
+
+    per_class = {
+        class_name: {
+            "total": class_totals[class_index],
+            "clean_accuracy": safe_ratio(class_clean_correct[class_index], class_totals[class_index]),
+            "adversarial_accuracy": safe_ratio(class_adversarial_correct[class_index], class_totals[class_index]),
+            "defended_adversarial_accuracy": safe_ratio(
+                class_defended_adversarial_correct[class_index],
+                class_totals[class_index],
+            ),
+        }
+        for class_index, class_name in enumerate(class_names)
+    }
+    metrics_output = args.output_json or metrics_path(args.metrics_dir, RANDOMIZATION_JSON)
+    write_metrics_json(
+        metrics_output,
+        {
+            "run_type": "defensive_randomization_evaluation",
+            "checkpoint": str(args.checkpoint),
+            "class_names": class_names,
+            "randomization": {
+                "epsilon": args.epsilon,
+                "resize_delta": args.resize_delta,
+                "total": total,
+                "clean_accuracy": clean_accuracy,
+                "defended_clean_accuracy": defended_clean_accuracy,
+                "adversarial_accuracy": adversarial_accuracy,
+                "defended_adversarial_accuracy": defended_adversarial_accuracy,
+                "standard_attack_success_rate": attack_success,
+                "defense_recovery_rate": recovery_rate,
+                "recovered_successful_attacks": defended_recoveries,
+                "successful_attacks": successful_attacks,
+                "per_class": per_class,
+            },
+        },
+    )
+    print(f"Metrics JSON written to {metrics_output}")
 
 
 if __name__ == "__main__":

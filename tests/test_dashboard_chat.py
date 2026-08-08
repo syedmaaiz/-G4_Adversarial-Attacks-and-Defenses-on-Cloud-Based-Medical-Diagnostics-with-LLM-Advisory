@@ -37,3 +37,33 @@ def test_dashboard_contains_interactive_stage_explorer() -> None:
     assert 'data-stage="fgsm"' in dashboard
     assert 'id="ask-stage"' in dashboard
     assert "selectStage" in dashboard
+
+
+def test_dashboard_reads_saved_metric_json(tmp_path) -> None:
+    metrics_dir = tmp_path / "metrics"
+    metrics_dir.mkdir()
+    (metrics_dir / "fgsm_baseline.json").write_text(
+        """{
+          "attack": {
+            "clean_accuracy": 0.91,
+            "adversarial_accuracy": 0.42,
+            "standard_attack_success_rate": 0.61,
+            "prediction_change_rate": 0.5,
+            "per_class": {
+              "NORMAL": {
+                "total": 10,
+                "clean_correct": 9,
+                "clean_accuracy": 0.9,
+                "adversarial_accuracy": 0.4,
+                "success_rate": 0.6
+              }
+            }
+          }
+        }""",
+        encoding="utf-8",
+    )
+    dashboard = render_dashboard(metrics_dir)
+
+    assert "91.00%" in dashboard
+    assert "42.00%" in dashboard
+    assert "latest saved metrics" in dashboard

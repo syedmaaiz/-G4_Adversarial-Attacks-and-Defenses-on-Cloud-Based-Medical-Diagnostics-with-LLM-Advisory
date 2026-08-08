@@ -7,6 +7,7 @@ import torch
 
 from src.attacks.fgsm import generate_fgsm_example
 from src.data.dataset import RAW_DATA_DIR, create_dataloaders
+from src.evaluation.metric_store import DEFAULT_METRICS_DIR, fgsm_output_name, metrics_path, write_metrics_json
 from src.models.predict import DEFAULT_CHECKPOINT, load_model
 
 
@@ -28,6 +29,8 @@ def parse_args() -> argparse.Namespace:
         help="Limit evaluated batches for smoke tests. Use 0 for the full test set.",
     )
     parser.add_argument("--num-workers", type=int, default=0)
+    parser.add_argument("--metrics-dir", type=Path, default=DEFAULT_METRICS_DIR)
+    parser.add_argument("--output-json", type=Path, default=None)
     return parser.parse_args()
 
 
@@ -123,6 +126,44 @@ def main() -> None:
         f"{args.epsilon},{total},{clean_accuracy:.4f},{adversarial_accuracy:.4f},"
         f"{prediction_change_rate:.4f},{standard_attack_success_rate:.4f}"
     )
+
+    per_class = {
+        class_name: {
+            "total": class_totals[class_index],
+            "clean_correct": class_clean_correct[class_index],
+            "successful_attacks": class_successful_attacks[class_index],
+            "success_rate": safe_ratio(
+                class_successful_attacks[class_index],
+                class_clean_correct[class_index],
+            ),
+        }
+        for class_index, class_name in enumerate(class_names)
+    }
+    metrics_output = args.output_json or metrics_path(
+        args.metrics_dir,
+        fgsm_output_name(args.checkpoint),
+    )
+    write_metrics_json(
+        metrics_output,
+        {
+            "run_type": "fgsm_evaluation",
+            "checkpoint": str(args.checkpoint),
+            "class_names": class_names,
+            "attack": {
+                "name": "FGSM",
+                "epsilon": args.epsilon,
+                "total": total,
+                "clean_accuracy": clean_accuracy,
+                "adversarial_accuracy": adversarial_accuracy,
+                "prediction_change_rate": prediction_change_rate,
+                "attack_candidates_clean_correct": attack_candidates,
+                "successful_attacks_clean_correct_to_wrong": successful_attacks,
+                "standard_attack_success_rate": standard_attack_success_rate,
+                "per_class": per_class,
+            },
+        },
+    )
+    print(f"Metrics JSON written to {metrics_output}")
 
 
 if __name__ == "__main__":

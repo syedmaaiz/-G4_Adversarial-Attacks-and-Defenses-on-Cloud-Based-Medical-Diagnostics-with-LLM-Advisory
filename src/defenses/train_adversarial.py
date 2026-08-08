@@ -8,6 +8,7 @@ import torch
 
 from src.attacks.fgsm import generate_fgsm_example
 from src.data.dataset import RAW_DATA_DIR, create_dataloaders
+from src.evaluation.metric_store import ADVERSARIAL_TRAINING_JSON, DEFAULT_METRICS_DIR, metrics_path, write_metrics_json
 from src.evaluation.metrics import ClassificationMetrics, evaluate_classifier
 from src.models.predict import build_resnet18
 from src.models.train_baseline import (
@@ -98,6 +99,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--epsilon", type=float, default=0.01)
     parser.add_argument("--adversarial-weight", type=float, default=0.5)
     parser.add_argument("--num-workers", type=int, default=0)
+    parser.add_argument("--metrics-dir", type=Path, default=DEFAULT_METRICS_DIR)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(
         "--pretrained",
@@ -204,6 +206,31 @@ def main() -> None:
         test_metrics,
     )
 
+    validation_metrics = ClassificationMetrics(**checkpoint["metrics"]["validation"])
+    metrics_output = metrics_path(args.metrics_dir, ADVERSARIAL_TRAINING_JSON)
+    write_metrics_json(
+        metrics_output,
+        {
+            "run_type": "adversarial_training",
+            "checkpoint": str(args.checkpoint),
+            "model": "ResNet18",
+            "pretrained": args.pretrained,
+            "epochs": args.epochs,
+            "best_epoch": best_epoch,
+            "batch_size": args.batch_size,
+            "learning_rate": args.learning_rate,
+            "val_fraction": args.val_fraction,
+            "epsilon": args.epsilon,
+            "adversarial_weight": args.adversarial_weight,
+            "seed": args.seed,
+            "class_names": class_names,
+            "class_weights": class_weight_values,
+            "validation": validation_metrics.__dict__,
+            "test": test_metrics.__dict__,
+            "test_adversarial_accuracy": test_adversarial_accuracy,
+        },
+    )
+    print(f"Metrics JSON written to {metrics_output}")
     elapsed_minutes = (perf_counter() - start_time) / 60
     print(f"Best epoch: {best_epoch}")
     print(f"Test {format_metrics(test_metrics)}")
